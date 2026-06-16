@@ -308,6 +308,7 @@ HTML_TEMPLATE = """
 <body>
 
     <div class="block-container">
+        <!-- ── Header ── -->
         <div class="aether-header">
             <div class="aether-brand">
                 <div class="aether-logo">✨</div>
@@ -316,13 +317,16 @@ HTML_TEMPLATE = """
             <div class="aether-badge">Online</div>
         </div>
 
+        <!-- ── Control Row (Clear Button) ── -->
         <div class="control-row" id="controlRow" style="display: none;">
             <button class="clear-btn" onclick="clearChat()">✕  Clear</button>
         </div>
 
+        <!-- ── Chat Area ── -->
         <div class="chat-area" id="chatArea"></div>
     </div>
 
+    <!-- ── Input Dock ── -->
     <div class="input-dock">
         <div class="input-dock-inner">
             <div class="stChatInputContainer">
@@ -331,6 +335,7 @@ HTML_TEMPLATE = """
         </div>
     </div>
 
+    <!-- ── State Pipeline Scripts ── -->
     <script>
         let chatHistory = [];
 
@@ -380,9 +385,8 @@ HTML_TEMPLATE = """
 
         function renderUserMessage(text) {
             const container = document.getElementById('chatArea');
-            // Basic sanitization and text substitution rules match regex sheet values
             let safe = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            safe = safe.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+            safe = safe.replace(/\\*\\*(.+?)\\*\\//g, '<strong>$1</strong>');
             safe = safe.replace(/\\*(.+?)\\*/g, '<em>$1</em>');
             safe = safe.replace(/`(.+?)`/g, '<code>$1</code>');
             safe = safe.replace(/\\n/g, '<br>');
@@ -463,10 +467,8 @@ def convert_markdown_to_html(text):
     Parses structural markdown properties down to plain HTML nodes.
     Matches the custom CSS classes targeting structural elements perfectly.
     """
-    # Safe string normalization conversions
     html = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     
-    # Tables parsing handler
     def parse_table(match):
         lines = match.group(0).strip().split('\n')
         table_html = "<table>"
@@ -482,6 +484,4 @@ def convert_markdown_to_html(text):
         return table_html
     html = re.sub(r'(\|[^\n]+\|\n\|[ \-.:|]+\|\n(?:\|[^\n]+\|\n*)+)', parse_table, html)
 
-    # Fenced code block structure conversions
     html = re.sub(r'
-http://googleusercontent.com/immersive_entry_chip/0
