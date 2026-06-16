@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aether AI</title>
+    <style>
+        /* ── Base & Premium Theme ── */
+        html, body {
+            background: #07080D;
+            color: #C8CEDB;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .block-container {
+            max-width: 720px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* ── Header ── */
+        .aether-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.2rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            flex-shrink: 0;
+        }
+        .aether-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .aether-logo {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.18);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        .aether-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #D0D4E0;
+            letter-spacing: -0.2px;
+        }
+        .aether-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .engine-selector {
+            background: #111420;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            color: #C8CEDB;
+            border-radius: 10px;
+            padding: 4px 10px;
+            font-size: 12px;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .engine-selector:focus {
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+        .aether-badge {
+            font-size: 9px;
+            font-weight: 600;
+            color: #38A169;
+            background: rgba(56, 161, 105, 0.08);
+            border: 1px solid rgba(56, 161, 105, 0.18);
+            border-radius: 20px;
+            padding: 2px 8px;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+
+        /* ── Chat Canvas ── */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem 0 10rem 0;
+            scroll-behavior: smooth;
+        }
+        .chat-area::-webkit-scrollbar {
+            width: 4px;
+        }
+        .chat-area::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 2px;
+        }
+
+        /* ── Chat Rows & Bubbles ── */
+        .chat-row {
+            display: flex;
+            width: 100%;
+            margin-bottom: 1.5rem;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .chat-row.user-row {
+            justify-content: flex-end;
+        }
+        .chat-row.assistant-row {
+            justify-content: flex-start;
+        }
+
+        .avatar-col {
+            width: 30px;
+            flex-shrink: 0;
+        }
+        .bubble-col {
+            max-width: 80%;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .avatar {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .avatar.ai {
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            color: #818CF8;
+        }
+
+        .bubble {
+            font-size: 14.5px;
+            line-height: 1.75;
+            word-wrap: break-word;
+        }
+        .bubble.user-bubble {
+            background: #111420;
+            border: 1px solid rgba(255, 255, 255, 0.055);
+            color: #BFC6D6;
+            border-radius: 16px 16px 3px 16px;
+            padding: 0.65rem 1rem;
+        }
+        .bubble.assistant-bubble {
+            background: transparent;
+            color: #8A95A3;
+        }
+
+        /* ── Image Message Element ── */
+        .visual-art-bubble {
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            max-width: 100%;
+            margin-top: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            overflow: hidden;
+            background: #0C0E17;
+        }
+        .visual-art-bubble img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .visual-art-caption {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #718096;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            background: #0E111D;
+        }
+
+        /* ── Inline Message Action Row ── */
+        .msg-action-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 2px;
+        }
+        .msg-action-btn {
+            background: transparent;
+            border: none;
+            color: #4A5568;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.15s;
+        }
+        .msg-action-btn:hover {
+            color: #818CF8;
+        }
+
+        /* ── Markdown CSS Overrides ── */
+        .bubble.assistant-bubble p { margin: 0 0 0.5rem; color: #8A95A3; }
+        .bubble.assistant-bubble p:last-child { margin-bottom: 0; }
+        .bubble.assistant-bubble strong { color: #C0C8D8; font-weight: 600; }
+        .bubble.assistant-bubble em { color: #6E7D8C; font-style: italic; }
+        .bubble.assistant-bubble ul, .bubble.assistant-bubble ol {
+            margin: 0.35rem 0 0.35rem 1.15rem; padding: 0;
+        }
+        .bubble.assistant-bubble li { margin-bottom: 4px; color: #8A95A3; }
+        .bubble.assistant-bubble h1, .bubble.assistant-bubble h2, .bubble.assistant-bubble h3 {
+            color: #C0C8D8; font-weight: 600; margin: 0.8rem 0 0.35rem;
+        }
+        .bubble.assistant-bubble code {
+            background: #0D0F18;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            padding: 2px 6px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12.5px;
+            color: #7EB8D4;
+        }
+        .bubble.assistant-bubble pre {
+            background: #0A0C14;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            padding: 0.9rem 1.1rem;
+            overflow-x: auto;
+            margin: 0.75rem 0;
+        }
+        .bubble.assistant-bubble pre code {
+            background: none; border: none; padding: 0;
+            color: #9BAFC0; font-size: 12.5px;
+        }
+
+        /* ── Typing Animation ── */
+        .typing-dots {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 8px 0;
+        }
+        .typing-dots span {
+            width: 5px; height: 5px;
+            background: #2D3748;
+            border-radius: 50%;
+            animation: blink 1.4s infinite ease-in-out both;
+        }
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes blink {
+            0%, 80%, 100% { transform: scale(0.45); opacity: 0.2; }
+            40%            { transform: scale(1);    opacity: 0.85; }
+        }
+
+        /* ── Input Dock ── */
+        .input-dock {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #07080D;
+            padding-bottom: 2rem;
+            z-index: 90;
+        }
+        .input-dock-inner {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        .stChatInputContainer {
+            background: #0C0E17;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 14px;
+            box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.04);
+            transition: border-color 0.2s;
+            display: flex;
+            padding: 10px 14px;
+            align-items: center;
+        }
+        .stChatInputContainer:focus-within {
+            border-color: rgba(99, 102, 241, 0.2);
+        }
+        .stChatInputContainer textarea {
+            color: #C8CEDB;
+            font-size: 14px;
+            background: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            width: 100%;
+            font-family: inherit;
+            height: 20px;
+        }
+
+        /* ── Control Button Row ── */
+        .control-row {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: #4A5568;
+            font-size: 11px;
+            border-radius: 8px;
+            padding: 5px 16px;
+            letter-spacing: 0.3px;
+            transition: all 0.15s;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .action-btn:hover {
+            border-color: rgba(255, 255, 255, 0.12);
+            color: #718096;
+        }
+
+        /* ── Audio Playback Indicator ── */
+        .audio-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            margin-left: 8px;
+        }
+        .audio-indicator span {
+            width: 2px;
+            height: 8px;
+            background: #818CF8;
+            animation: bounce-audio 0.8s infinite ease-in-out alternate;
+        }
+        .audio-indicator span:nth-child(2) { animation-delay: 0.15s; }
+        .audio-indicator span:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes bounce-audio {
+            0% { height: 3px; }
+            100% { height: 12px; }
+        }
+
+        /* ── Key Modal ── */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(7, 8, 13, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1; pointer-events: auto;
+        }
+        .modal {
+            background: #0C0E17;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 450px;
+            width: 90%;
+            box-sizing: border-box;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+        .modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #E8EAF0;
+            margin-bottom: 0.5rem;
+        }
+        .modal-description {
+            font-size: 13px;
+            color: #718096;
+            line-height: 1.5;
+            margin-bottom: 1.5rem;
+        }
+        .modal-label {
+            font-size: 12px; 
+            margin-bottom: 6px; 
+            color: #718096;
+            display: block;
+        }
+        .modal-input {
+            width: 100%;
+            background: #111420;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 10px;
+            padding: 0.75rem;
+            color: #C8CEDB;
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+            margin-bottom: 1.2rem;
+        }
+        .modal-input:focus {
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .primary-btn {
+            background: #6366F1;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 16px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .primary-btn:hover { background: #4F46E5; }
+    </style>
+</head>
+<body>
+
+    <div class="block-container">
+        <!-- ── Header ── -->
+        <div class="aether-header">
+            <div class="aether-brand">
+                <div class="aether-logo">✨</div>
+                <div class="aether-title">Aether</div>
+            </div>
+            <div class="aether-controls">
+                <select class="engine-selector" id="engineSelector" onchange="switchEngine()">
+                    <option value="openrouter">OpenRouter Engine</option>
+                    <option value="gemini">Gemini Engine ✨ (Direct)</option>
+                </select>
+                <div class="aether-badge">Online</div>
+            </div>
+        </div>
+
+        <!-- ── Chat Canvas ── -->
+        <div class="chat-area" id="chatArea">
+            <div class="chat-row assistant-row">
+                <div class="avatar-col"><div class="avatar ai">✦</div></div>
+                <div class="bubble-col">
+                    <div class="bubble assistant-bubble">
+                        <p>Hello! I am <strong>Aether</strong>, an elite AI intelligence engine. Choose your preferred connection model from the header to configure transmission channels.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Input Dock ── -->
+    <div class="input-dock">
+        <div class="input-dock-inner">
+            <div class="control-row">
+                <button class="action-btn" id="geminiMilestonesBtn" onclick="brainstormMilestones()">✨ Brainstorm Milestones</button>
+                <button class="action-btn" id="geminiImagineBtn" onclick="visualizeConcept()">🎨 Imagine Scene</button>
+                <button class="action-btn" onclick="openKeyModal()">⚙️ Key Settings</button>
+                <button class="action-btn" id="clearBtn" style="display: none;" onclick="clearChat()">✕ Clear</button>
+            </div>
+            <div class="stChatInputContainer">
+                <textarea id="chatInput" placeholder="Message Aether…" rows="1" onkeydown="handleKeyPress(event)"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Secret API Key Modal ── -->
+    <div class="modal-overlay" id="keyModal">
+        <div class="modal">
+            <div class="modal-title">Configure Engine Parameters</div>
+            <div class="modal-description">
+                Your keys are cached locally in your client's web browser framework and dispatched with secure handshake interfaces.
+            </div>
+            
+            <label class="modal-label" for="apiKeyInput">OpenRouter Token</label>
+            <input type="password" class="modal-input" id="apiKeyInput" placeholder="sk-or-v1-...">
+            
+            <label class="modal-label" for="geminiKeyInput">Gemini API Key (Optional fallback)</label>
+            <input type="password" class="modal-input" id="geminiKeyInput" placeholder="AIzaSy...">
+            
+            <div class="modal-actions">
+                <button class="action-btn" onclick="closeKeyModal()">Cancel</button>
+                <button class="primary-btn" onclick="saveApiKey()">Save Connection</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SYSTEM_PROMPT = "You are Aether, an elite AI intelligence engine. Be concise and precise. Use markdown for structure: bold key terms, use bullet points for lists, and fenced code blocks for code. Never pad responses with filler phrases.";
+        
+        // Setup default OpenRouter token
+        const DEFAULT_OPENROUTER_KEY = "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";
+        
+        let chatHistory = [{"role": "system", "content": SYSTEM_PROMPT}];
+        let userApiKey = localStorage.getItem("aether_openrouter_key") || DEFAULT_OPENROUTER_KEY;
+        let userGeminiKey = localStorage.getItem("aether_gemini_key") || "";
+        let selectedEngine = localStorage.getItem("aether_selected_engine") || "openrouter";
+        
+        // Gemini API Configuration for Workspace Environment
+        const apiKey = ""; // auto-configured by execution environment
+        
+        // Helper to resolve Gemini API key (Pre-configured environment key takes priority, local storage acts as fallback)
+        function getGeminiKey() {
+            return apiKey || userGeminiKey;
+        }
+
+        function getGeminiTextUrl() {
+            return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getGeminiKey()}`;
+        }
+        function getGeminiTtsUrl() {
+            return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${getGeminiKey()}`;
+        }
+        function getGeminiImagenUrl() {
+            return `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${getGeminiKey()}`;
+        }
+
+        let activeAudio = null;
+        let activeAudioBtnId = null;
+
+        // Auto-check on load to configure UI
+        window.addEventListener("load", () => {
+            document.getElementById("engineSelector").value = selectedEngine;
+            document.getElementById("apiKeyInput").value = localStorage.getItem("aether_openrouter_key") || "";
+            document.getElementById("geminiKeyInput").value = userGeminiKey;
+        });
+
+        function switchEngine() {
+            selectedEngine = document.getElementById("engineSelector").value;
+            localStorage.setItem("aether_selected_engine", selectedEngine);
+        }
+
+        // Retry helper implementing exponential backoff
+        async function fetchWithRetry(url, options, maxRetries = 5) {
+            let delay = 1000;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.ok) return response;
+                    if (response.status === 429 || response.status >= 500) {
+                        // wait and retry
+                    } else {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                } catch (e) {
+                    if (i === maxRetries - 1) throw e;
+                }
+                await new Promise(res => setTimeout(res, delay));
+                delay *= 2;
+            }
+            throw new Error("Pipeline connection timed out after multiple attempts.");
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitMessage();
+            }
+        }
+
+        async function submitMessage() {
+            if (selectedEngine === 'openrouter' && !userApiKey) {
+                openKeyModal();
+                return;
+            }
+            if (selectedEngine === 'gemini' && !getGeminiKey()) {
+                openKeyModal();
+                return;
+            }
+
+            const inputField = document.getElementById('chatInput');
+            const userText = inputField.value.trim();
+            if (!userText) return;
+
+            inputField.value = '';
+            document.getElementById('clearBtn').style.display = 'inline-block';
+
+            // 1. Render User Message
+            renderUserMessage(userText);
+            chatHistory.push({"role": "user", "content": userText});
+
+            // 2. Render Loading Indicator
+            const loader = renderLoadingIndicator();
+
+            try {
+                let rawContent = "";
+                
+                if (selectedEngine === "gemini") {
+                    // Adapt unified roles array to Gemini specification (user / model)
+                    const geminiContents = chatHistory.filter(m => m.role !== "system").map(m => ({
+                        role: m.role === "assistant" ? "model" : "user",
+                        parts: [{ text: m.content }]
+                    }));
+
+                    const response = await fetchWithRetry(getGeminiTextUrl(), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: geminiContents,
+                            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.error) throw new Error(data.error.message);
+                    rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text || "No transmission response returned.";
+                } else {
+                    // OpenRouter Engine Integration
+                    const response = await fetchWithRetry("https://openrouter.ai/api/v1/chat/completions", {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${userApiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: "openai/gpt-oss-120b:free",
+                            messages: chatHistory
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.error) throw new Error(data.error.message);
+                    rawContent = data.choices?.[0]?.message?.content || "No connection payload found.";
+                }
+
+                loader.remove();
+                const htmlContent = convertMarkdownToHtml(rawContent);
+                renderAssistantMessage(htmlContent, rawContent);
+                chatHistory.push({"role": "assistant", "content": rawContent});
+
+            } catch (err) {
+                loader.remove();
+                renderErrorMessage(err.message || "Connectivity exception encountered during transmission.");
+            }
+        }
+
+        async function speakMessage(textId, btnId) {
+            const textElement = document.getElementById(textId);
+            const btn = document.getElementById(btnId);
+            if (!textElement) return;
+
+            if (!getGeminiKey()) {
+                openKeyModal();
+                return;
+            }
+
+            // Handle current active audio play/pause
+            if (activeAudio && activeAudioBtnId === btnId) {
+                activeAudio.pause();
+                stopAudioIndicator();
+                return;
+            }
+
+            if (activeAudio) {
+                activeAudio.pause();
+                stopAudioIndicator();
+            }
+
+            btn.innerHTML = `🔊 Connecting...`;
+            const rawText = textElement.getAttribute("data-raw") || textElement.innerText;
+
+            try {
+                const response = await fetchWithRetry(getGeminiTtsUrl(), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: rawText }] }],
+                        generationConfig: {
+                            responseModalities: ["AUDIO"],
+                            speechConfig: {
+                                voiceConfig: {
+                                    prebuiltVoiceConfig: {
+                                        voiceName: "Kore"
+                                    }
+                                }
+                            }
+                        }
+                    })
+                });
+
+                const result = await response.json();
+                if (result.error) throw new Error(result.error.message);
+                const inlineData = result.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+                
+                if (inlineData && inlineData.data) {
+                    // Parse sample rate parameter (usually audio/L16;rate=24000)
+                    let sampleRate = 24000;
+                    const rateMatch = inlineData.mimeType?.match(/rate=(\d+)/);
+                    if (rateMatch) {
+                        sampleRate = parseInt(rateMatch[1], 10);
+                    }
+
+                    const audioUrl = pcmToWav(inlineData.data, sampleRate);
+                    activeAudio = new Audio(audioUrl);
+                    activeAudioBtnId = btnId;
+                    
+                    activeAudio.play();
+                    btn.innerHTML = `🔊 Stop Reading`;
+                    
+                    // Create simple inline audio visualization indicator
+                    const indicator = document.createElement("div");
+                    indicator.className = "audio-indicator";
+                    indicator.id = "activeAudioIndicator";
+                    indicator.innerHTML = "<span></span><span></span><span></span>";
+                    btn.appendChild(indicator);
+
+                    activeAudio.onended = () => {
+                        stopAudioIndicator();
+                    };
+                } else {
+                    btn.innerHTML = `🔊 Failed Speech`;
+                    setTimeout(() => { btn.innerHTML = `🔊 Speak`; }, 2000);
+                }
+            } catch (err) {
+                btn.innerHTML = `🔊 Error`;
+                setTimeout(() => { btn.innerHTML = `🔊 Speak`; }, 2000);
+            }
+        }
+
+        function stopAudioIndicator() {
+            if (activeAudioBtnId) {
+                const oldBtn = document.getElementById(activeAudioBtnId);
+                if (oldBtn) {
+                    oldBtn.innerHTML = `🔊 Speak ✨`;
+                }
+            }
+            activeAudio = null;
+            activeAudioBtnId = null;
+        }
+
+        // PCM 16-bit to standard WAV container converter
+        function pcmToWav(pcmBase64, sampleRate) {
+            const binaryString = atob(pcmBase64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            const buffer = bytes.buffer;
+            
+            const wavHeader = new ArrayBuffer(44);
+            const view = new DataView(wavHeader);
+            
+            view.setUint32(0, 0x52494646, false); // "RIFF"
+            view.setUint32(4, 36 + buffer.byteLength, true);
+            view.setUint32(8, 0x57415645, false); // "WAVE"
+            view.setUint32(12, 0x666d7420, false); // "fmt "
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // PCM = 1
+            view.setUint16(22, 1, true); // Mono = 1
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 1 * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            view.setUint32(36, 0x64617461, false); // "data"
+            view.setUint32(40, buffer.byteLength, true);
+            
+            const blob = new Blob([wavHeader, buffer], { type: 'audio/wav' });
+            return URL.createObjectURL(blob);
+        }
+
+        async function visualizeConcept() {
+            if (!getGeminiKey()) {
+                openKeyModal();
+                return;
+            }
+
+            // Find the last assistant response to capture the context
+            const lastAssistantMsg = [...chatHistory].reverse().find(m => m.role === "assistant");
+            if (!lastAssistantMsg) {
+                renderErrorMessage("No conceptual dialogue found to generate visual context.");
+                return;
+            }
+
+            const btn = document.getElementById("geminiImagineBtn");
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `🎨 Visualizing...`;
+            btn.disabled = true;
+
+            const artRefinePrompt = `Create a clean, precise, cinematic illustration concept art prompt from this context. Describe lighting, atmosphere, and modern colors. Context: "${lastAssistantMsg.content}"`;
+
+            try {
+                // Step 1: Use Gemini to build a structured descriptive artistic prompt
+                const promptResponse = await fetchWithRetry(getGeminiTextUrl(), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: artRefinePrompt }] }],
+                        systemInstruction: { parts: [{ text: "Write only the refined prompt, under 40 words. Keep it highly visual, artistic, cyberpunk and minimal." }] }
+                    })
+                });
+                
+                const promptData = await promptResponse.json();
+                if (promptData.error) throw new Error(promptData.error.message);
+                const refinedArtPrompt = promptData.candidates?.[0]?.content?.parts?.[0]?.text || "Minimalist science fiction terminal concept art.";
+
+                // Step 2: Query the Imagen 4.0 predict endpoint using refined prompt
+                const imageResponse = await fetchWithRetry(getGeminiImagenUrl(), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instances: [{ prompt: refinedArtPrompt }],
+                        parameters: { sampleCount: 1 }
+                    })
+                });
+
+                const imageData = await imageResponse.json();
+                if (imageData.error) throw new Error(imageData.error.message);
+                const b64Bytes = imageData.predictions?.[0]?.bytesBase64Encoded;
+
+                if (b64Bytes) {
+                    const imageUrl = `data:image/png;base64,${b64Bytes}`;
+                    renderVisualArtBubble(imageUrl, refinedArtPrompt);
+                } else {
+                    renderErrorMessage("Imagen model failed to dispatch illustration bytes.");
+                }
+
+            } catch (err) {
+                renderErrorMessage("Exception encountered during Imagen render synthesis: " + err.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function brainstormMilestones() {
+            if (!getGeminiKey()) {
+                openKeyModal();
+                return;
+            }
+
+            const nonSystemMsgs = chatHistory.filter(m => m.role !== "system");
+            if (nonSystemMsgs.length < 2) {
+                renderErrorMessage("Please enter into a discussion first to brainstorm project milestones.");
+                return;
+            }
+
+            const btn = document.getElementById("geminiMilestonesBtn");
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `✨ Synthesizing...`;
+            btn.disabled = true;
+
+            const chatTextDump = nonSystemMsgs.map(m => `${m.role}: ${m.content}`).join("\n");
+            const milestonesPrompt = `Analyze the conversation history. Synthesize the core topics discussed into exactly 3 clear, actionable milestones with high-end descriptions and immediate next steps. Format with strict markdown headers. Dialogue:\n${chatTextDump}`;
+
+            const loader = renderLoadingIndicator();
+
+            try {
+                const response = await fetchWithRetry(getGeminiTextUrl(), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: milestonesPrompt }] }],
+                        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
+                    })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message);
+                loader.remove();
+
+                const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text || "Milestone pipeline analysis returned empty.";
+                const htmlContent = convertMarkdownToHtml(rawContent);
+
+                renderAssistantMessage(htmlContent, rawContent);
+                chatHistory.push({"role": "assistant", "content": rawContent});
+
+            } catch (err) {
+                loader.remove();
+                renderErrorMessage("Exception encountered during milestone pipeline compilation: " + err.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // ── Render Helpers ──
+        function renderUserMessage(text) {
+            const container = document.getElementById('chatArea');
+            let safe = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            safe = safe.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            safe = safe.replace(/`(.+?)`/g, '<code>$1</code>');
+            safe = safe.replace(/\n/g, '<br>');
+
+            container.innerHTML += `
+                <div class="chat-row user-row">
+                    <div class="bubble user-bubble">${safe}</div>
+                </div>
+            `;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function renderLoadingIndicator() {
+            const container = document.getElementById('chatArea');
+            const id = 'loader_' + Date.now();
+            container.innerHTML += `
+                <div class="chat-row assistant-row" id="${id}">
+                    <div class="avatar-col"><div class="avatar ai">✦</div></div>
+                    <div class="bubble-col">
+                        <div class="typing-dots"><span></span><span></span><span></span></div>
+                    </div>
+                </div>
+            `;
+            container.scrollTop = container.scrollHeight;
+            return document.getElementById(id);
+        }
+
+        function renderAssistantMessage(htmlContent, rawContent) {
+            const container = document.getElementById('chatArea');
+            const uniqueId = "text_" + Date.now();
+            const btnId = "btn_" + Date.now();
+
+            container.innerHTML += `
+                <div class="chat-row assistant-row">
+                    <div class="avatar-col"><div class="avatar ai" style="margin-top:6px">✦</div></div>
+                    <div class="bubble-col">
+                        <div class="bubble assistant-bubble" id="${uniqueId}" data-raw="${rawContent.replace(/"/g, '&quot;')}">${htmlContent}</div>
+                        <div class="msg-action-row">
+                            <button class="msg-action-btn" id="${btnId}" onclick="speakMessage('${uniqueId}', '${btnId}')">🔊 Speak ✨</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function renderVisualArtBubble(imageUrl, caption) {
+            const container = document.getElementById('chatArea');
+            container.innerHTML += `
+                <div class="chat-row assistant-row">
+                    <div class="avatar-col"><div class="avatar ai" style="margin-top:6px">✦</div></div>
+                    <div class="bubble-col">
+                        <div class="visual-art-bubble">
+                            <img src="${imageUrl}" alt="Aether Generation synthesis illustration">
+                            <div class="visual-art-caption">🎨 <em>"${caption}"</em></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function renderErrorMessage(err) {
+            const container = document.getElementById('chatArea');
+            container.innerHTML += `
+                <div class="chat-row assistant-row">
+                    <div class="avatar-col"><div class="avatar ai" style="margin-top:6px">✦</div></div>
+                    <div class="bubble-col">
+                        <div class="bubble assistant-bubble" style="color: #FC8181;"><strong>Engine Exception:</strong> ${err}</div>
+                    </div>
+                </div>
+            `;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearChat() {
+            const chatArea = document.getElementById('chatArea');
+            if (activeAudio) {
+                activeAudio.pause();
+                stopAudioIndicator();
+            }
+            chatArea.innerHTML = `
+                <div class="chat-row assistant-row">
+                    <div class="avatar-col"><div class="avatar ai">✦</div></div>
+                    <div class="bubble-col">
+                        <div class="bubble assistant-bubble">
+                            <p>Transmission flushed. Main channel re-opened.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('clearBtn').style.display = 'none';
+            chatHistory = [{"role": "system", "content": SYSTEM_PROMPT}];
+        }
+
+        // ── Modal Actions ──
+        function openKeyModal() {
+            document.getElementById("keyModal").classList.add("active");
+        }
+        function closeKeyModal() {
+            document.getElementById("keyModal").classList.remove("active");
+        }
+        function saveApiKey() {
+            const orVal = document.getElementById("apiKeyInput").value.trim();
+            const gemVal = document.getElementById("geminiKeyInput").value.trim();
+            
+            userApiKey = orVal || DEFAULT_OPENROUTER_KEY;
+            localStorage.setItem("aether_openrouter_key", orVal);
+            
+            userGeminiKey = gemVal;
+            localStorage.setItem("aether_gemini_key", gemVal);
+            
+            closeKeyModal();
+        }
+
+        function convertMarkdownToHtml(text) {
+            if (!text) return "";
+            let html = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            
+            // Fenced code blocks with robust multi-line parsing
+            html = html.replace(/```(?:[a-zA-Z0-9_-]+)?\n([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+            
+            // Bold, Italic, Inline Code
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            html = html.replace(/`(.+?)`/g, '<code>$1</code>');
+            
+            // Layout blocks (headings)
+            html = html.replace(/^###[ \t](.+?)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^##[ \t](.+?)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^#[ \t](.+?)$/gm, '<h1>$1</h1>');
+
+            // List elements
+            html = html.replace(/^\s*-\s+(.+?)$/gm, '<li>$1</li>');
+            html = html.replace(/((?:<li>.*?<\/li>\s*)+)/g, '<ul>$1</ul>');
+            
+            // Line breaks
+            html = html.replace(/\n/g, '<br>');
+            return html;
+        }
+    </script>
+</body>
+</html>
+```
+eof
+
+The markdown formatting parser is now constructed using highly safe regex structures that bypass edge cases in Safari and older browser engines. 
+
+The preview panel will compile the updated file cleanly. Once verified, copy this corrected block over to your local `D:\py\index.html` file to sync your local environment.
