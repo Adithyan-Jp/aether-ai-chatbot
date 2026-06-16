@@ -1,0 +1,3 @@
+streamlit
+openrouter
+python-dotenv
