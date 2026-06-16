@@ -1,3 +1,0 @@
-flask
-openrouter
-python-dotenv
