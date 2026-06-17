@@ -5,7 +5,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
-API_KEY = os.getenv("OPENROUTER_API_KEY")
+API_KEY = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY")
 
 st.set_page_config(
     page_title="Aether AI",
@@ -247,6 +247,19 @@ div[data-testid="stButton"] > button:hover {
     border-top: 1px solid rgba(255,255,255,0.03);
     margin: 0.25rem 0 1.75rem;
 }
+
+/* ── Streaming cursor ── */
+.stream-cursor::after {
+    content: "▋";
+    color: #818CF8;
+    animation: cursor-blink 0.7s step-end infinite;
+    margin-left: 1px;
+    font-size: 13px;
+}
+@keyframes cursor-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -305,6 +318,47 @@ def render_message(role: str, content: str):
             st.markdown(content, unsafe_allow_html=False)
             st.markdown('</div>', unsafe_allow_html=True)
 
+
+def stream_response(messages: list) -> str:
+    """Stream from OpenRouter and return the full assembled text."""
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=API_KEY,
+    )
+
+    # Avatar column stays fixed; text streams into the right column
+    col1, col2 = st.columns([0.04, 0.96])
+    with col1:
+        st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
+
+    with col2:
+        stream_placeholder = st.empty()
+        accumulated = ""
+
+        with client.chat.completions.create(
+            model="openai/gpt-oss-120b:free",
+            messages=messages,
+            stream=True,
+        ) as stream:
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    accumulated += delta
+                    # Show live markdown with blinking cursor appended
+                    stream_placeholder.markdown(
+                        f'<div class="bubble assistant-bubble stream-cursor">'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                    # Render actual markdown content via st.markdown (no unsafe_allow_html
+                    # so Streamlit's markdown renderer handles code blocks, bold, etc.)
+                    stream_placeholder.markdown(accumulated + "▋")
+
+        # Final render — drop the cursor
+        stream_placeholder.markdown(accumulated)
+
+    return accumulated
+
 # ── History ───────────────────────────────────────────────────────────────────
 
 non_system = [m for m in st.session_state.messages if m["role"] != "system"]
@@ -326,30 +380,9 @@ if user_input := st.chat_input("Message Aether…"):
     st.session_state.messages.append({"role": "user", "content": user_input})
     render_message("user", user_input)
 
-    placeholder = st.empty()
-    placeholder.markdown("""
-    <div class="chat-row assistant-row">
-        <div class="avatar ai">✦</div>
-        <div class="typing-dots"><span></span><span></span><span></span></div>
-    </div>
-    """, unsafe_allow_html=True)
-
     try:
-        client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=API_KEY,
-        )
-
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-120b:free",
-            messages=st.session_state.messages,
-        )
-
-        ai_text = response.choices[0].message.content
-        placeholder.empty()
-        render_message("assistant", ai_text)
+        ai_text = stream_response(st.session_state.messages)
         st.session_state.messages.append({"role": "assistant", "content": ai_text})
 
     except Exception as exc:
-        placeholder.empty()
         render_message("assistant", f"**Error:** {exc}")
