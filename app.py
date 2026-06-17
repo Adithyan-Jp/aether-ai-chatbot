@@ -8,8 +8,8 @@ load_dotenv()
 API_KEY = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY")
 
 st.set_page_config(
-    page_title="Chunni AI",
-    page_icon="💧",
+    page_title="Aether AI",
+    page_icon="✨",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
@@ -49,8 +49,8 @@ st.markdown("""
     width: 30px;
     height: 30px;
     border-radius: 8px;
-    background: rgba(56,189,248,0.12);
-    border: 1px solid rgba(56,189,248,0.18);
+    background: rgba(99,102,241,0.12);
+    border: 1px solid rgba(99,102,241,0.18);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -99,9 +99,9 @@ st.markdown("""
     margin-top: 3px;
 }
 .avatar.ai {
-    background: rgba(56,189,248,0.12);
-    border: 1px solid rgba(56,189,248,0.2);
-    color: #7DD3FC;
+    background: rgba(99,102,241,0.12);
+    border: 1px solid rgba(99,102,241,0.2);
+    color: #818CF8;
 }
 .avatar.user {
     background: rgba(255,255,255,0.04);
@@ -165,7 +165,7 @@ st.markdown("""
     color: #9BAFC0; font-size: 12.5px;
 }
 .bubble.assistant-bubble blockquote {
-    border-left: 2px solid rgba(56,189,248,0.3);
+    border-left: 2px solid rgba(99,102,241,0.3);
     margin: 0.5rem 0;
     padding-left: 0.9rem;
     color: #6E7D8C;
@@ -213,21 +213,16 @@ st.markdown("""
     background: #0C0E17 !important;
     border: 1px solid rgba(255,255,255,0.07) !important;
     border-radius: 14px !important;
-    box-shadow: none !important;
+    box-shadow: 0 0 0 1px rgba(99,102,241,0.04) !important;
     transition: border-color 0.2s !important;
 }
 .stChatInputContainer:focus-within {
-    border-color: rgba(56,189,248,0.2) !important;
-    box-shadow: none !important;
+    border-color: rgba(99,102,241,0.2) !important;
 }
 .stChatInputContainer textarea {
     color: #C8CEDB !important;
     font-size: 14px !important;
     background: transparent !important;
-}
-textarea:focus {
-    outline: none !important;
-    box-shadow: none !important;
 }
 
 /* ── Clear button ── */
@@ -256,7 +251,7 @@ div[data-testid="stButton"] > button:hover {
 /* ── Streaming cursor ── */
 .stream-cursor::after {
     content: "▋";
-    color: #7DD3FC;
+    color: #818CF8;
     animation: cursor-blink 0.7s step-end infinite;
     margin-left: 1px;
     font-size: 13px;
@@ -277,7 +272,7 @@ if not API_KEY:
 # ── Session state ─────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = (
-    "You are Chunni, an elite AI intelligence engine. "
+    "You are Aether, an elite AI intelligence engine. "
     "Be concise and precise. Use markdown for structure: bold key terms, "
     "use bullet points for lists, and fenced code blocks for code. "
     "Never pad responses with filler phrases."
@@ -291,8 +286,8 @@ if "messages" not in st.session_state:
 st.markdown("""
 <div class="aether-header">
     <div class="aether-brand">
-        <div class="aether-logo">💦</div>
-        <div class="aether-title">Chunni</div>
+        <div class="aether-logo">✨</div>
+        <div class="aether-title">Aether</div>
     </div>
     <div class="aether-badge">Online</div>
 </div>
@@ -317,7 +312,7 @@ def render_message(role: str, content: str):
     else:
         col1, col2 = st.columns([0.04, 0.96])
         with col1:
-            st.markdown('<div class="avatar ai" style="margin-top:6px">💧</div>', unsafe_allow_html=True)
+            st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
         with col2:
             st.markdown('<div class="bubble assistant-bubble">', unsafe_allow_html=True)
             st.markdown(content, unsafe_allow_html=False)
@@ -331,9 +326,10 @@ def stream_response(messages: list) -> str:
         api_key=API_KEY,
     )
 
+    # Avatar column stays fixed; text streams into the right column
     col1, col2 = st.columns([0.04, 0.96])
     with col1:
-        st.markdown('<div class="avatar ai" style="margin-top:6px">💧</div>', unsafe_allow_html=True)
+        st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
 
     with col2:
         stream_placeholder = st.empty()
@@ -348,6 +344,14 @@ def stream_response(messages: list) -> str:
                 delta = chunk.choices[0].delta.content
                 if delta:
                     accumulated += delta
+                    # Show live markdown with blinking cursor appended
+                    stream_placeholder.markdown(
+                        f'<div class="bubble assistant-bubble stream-cursor">'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                    # Render actual markdown content via st.markdown (no unsafe_allow_html
+                    # so Streamlit's markdown renderer handles code blocks, bold, etc.)
                     stream_placeholder.markdown(accumulated + "▋")
 
         # Final render — drop the cursor
@@ -371,7 +375,7 @@ if non_system:
 
 # ── Input & inference ─────────────────────────────────────────────────────────
 
-if user_input := st.chat_input("Message Chunni…"):
+if user_input := st.chat_input("Message Aether…"):
 
     st.session_state.messages.append({"role": "user", "content": user_input})
     render_message("user", user_input)
