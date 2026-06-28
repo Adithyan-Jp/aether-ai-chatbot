@@ -1,20 +1,21 @@
 import os
 import re
+import base64
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
-# Update your .env or Streamlit secrets with your NVIDIA API key (starts with nvapi-)
 API_KEY = os.getenv("NVIDIA_API_KEY") or st.secrets.get("NVIDIA_API_KEY")
 
 st.set_page_config(
-    page_title="Aether AI",
+    page_title="Aether Multimodal AI",
     page_icon="✨",
     layout="centered",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
+# ── Custom Styling ────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 /* ── Base ── */
@@ -27,6 +28,12 @@ st.markdown("""
     padding-bottom: 8rem !important;
 }
 #MainMenu, footer, header { visibility: hidden; }
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background-color: #0C0E17 !important;
+    border-right: 1px solid rgba(255,255,255,0.04) !important;
+}
 
 /* ── Header ── */
 .aether-header {
@@ -104,11 +111,6 @@ st.markdown("""
     border: 1px solid rgba(99,102,241,0.2);
     color: #818CF8;
 }
-.avatar.user {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #606880;
-}
 
 /* ── Bubbles ── */
 .bubble {
@@ -165,36 +167,24 @@ st.markdown("""
     background: none; border: none; padding: 0;
     color: #9BAFC0; font-size: 12.5px;
 }
-.bubble.assistant-bubble blockquote {
-    border-left: 2px solid rgba(99,102,241,0.3);
-    margin: 0.5rem 0;
-    padding-left: 0.9rem;
-    color: #6E7D8C;
+
+/* Thinking Box wrapper */
+.thinking-box {
+    border-left: 2px solid #4F46E5;
+    background: rgba(79, 70, 229, 0.03);
+    padding: 0.5rem 0.8rem;
+    margin-bottom: 0.75rem;
+    border-radius: 0 6px 6px 0;
+    color: #6366F1 !important;
+    font-family: monospace;
+    font-size: 13.5px;
 }
-.bubble.assistant-bubble hr {
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    margin: 0.75rem 0;
-}
-.bubble.assistant-bubble table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 13px;
-    margin: 0.5rem 0;
-}
-.bubble.assistant-bubble th, .bubble.assistant-bubble td {
-    border: 1px solid rgba(255,255,255,0.07);
-    padding: 6px 10px;
-    text-align: left;
-}
-.bubble.assistant-bubble th { color: #C0C8D8; background: rgba(255,255,255,0.03); }
 
 /* ── Input ── */
 .stChatInputContainer {
     background: #0C0E17 !important;
     border: 1px solid rgba(255,255,255,0.07) !important;
     border-radius: 14px !important;
-    box-shadow: 0 0 0 1px rgba(99,102,241,0.04) !important;
     transition: border-color 0.2s !important;
 }
 .stChatInputContainer:focus-within {
@@ -214,136 +204,214 @@ div[data-testid="stButton"] > button {
     font-size: 11px !important;
     border-radius: 8px !important;
     padding: 3px 12px !important;
-    letter-spacing: 0.3px;
     transition: all 0.15s !important;
 }
 div[data-testid="stButton"] > button:hover {
     border-color: rgba(255,255,255,0.09) !important;
     color: #A0AEC0 !important;
 }
-
-/* ── Divider ── */
-.msg-divider {
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.03);
-    margin: 0.25rem 0 1.75rem;
-}
 </style>
 """, unsafe_allow_html=True)
 
 # ── Guard ─────────────────────────────────────────────────────────────────────
-
 if not API_KEY:
-    st.error("🔑 NVIDIA API key not found. Check your environment variables.")
+    st.error("🔑 NVIDIA API key not found. Check your environment configuration.")
     st.stop()
 
-# ── Session state ─────────────────────────────────────────────────────────────
+# ── Helper Functions ──────────────────────────────────────────────────────────
+def get_nvidia_client():
+    return OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=API_KEY)
 
+def encode_image(uploaded_file):
+    """Encode an uploaded Streamlit file to a Base64 string."""
+    return base64.b64encode(uploaded_file.read()).decode("utf-8")
+
+def parse_reasoning_content(text: str):
+    """Extract <think> tags dynamically for reasoning architectures."""
+    think_match = re.search(r"<think>(.*?)</think>", text, re.DOTALL)
+    if think_match:
+        thinking = think_match.group(1).strip()
+        answer = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+        return thinking, answer
+    return None, text
+
+# ── Sidebar Controls (Modality Configurations) ────────────────────────────────
+with st.sidebar:
+    st.markdown("<h3 style='color:#D0D4E0;'>🎛️ Engine Configuration</h3>", unsafe_allow_html=True)
+    
+    # Model Router
+    model_choice = st.selectbox(
+        "Select Active NIM Architecture",
+        options=[
+            "nvidia/llama-3.1-nemotron-70b-instruct",
+            "meta/llama-3.1-70b-instruct",
+            "deepseek/deepseek-r1",
+            "nvidia/cosmos-1.0-vision-70b"
+        ],
+        index=0
+    )
+    
+    st.markdown("---")
+    st.markdown("<h4 style='color:#D0D4E0;'>🖼️ Vision Layer</h4>", unsafe_allow_html=True)
+    uploaded_image = st.file_uploader("Attach Image to Next Turn", type=["png", "jpg", "jpeg"])
+    if uploaded_image:
+        st.image(uploaded_image, caption="Staged Visual Asset", use_container_width=True)
+        
+    st.markdown("---")
+    st.markdown("<h4 style='color:#D0D4E0;'>🔊 Audio Layer</h4>", unsafe_allow_html=True)
+    enable_voice = st.checkbox("Enable Text-To-Speech Playback", value=False)
+
+# ── Initialization ────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = (
-    "You are Aether, an elite AI intelligence engine powered by NVIDIA. "
-    "Be concise and precise. Use markdown for structure: bold key terms, "
-    "use bullet points for lists, and fenced code blocks for code. "
-    "Never pad responses with filler phrases."
+    "You are Aether, an elite physical and cognitive multimodal engine powered by NVIDIA NIMs. "
+    "Be precise and computationally direct. Use markdown: bold key expressions, bullet points for listings, "
+    "and proper syntax formatting on code blocks. Do not produce boilerplate greetings or filler language."
 )
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
 # ── Header ────────────────────────────────────────────────────────────────────
-
 st.markdown("""
 <div class="aether-header">
     <div class="aether-brand">
         <div class="aether-logo">✨</div>
-        <div class="aether-title">Aether</div>
+        <div class="aether-title">Aether Multimodal</div>
     </div>
-    <div class="aether-badge">Online</div>
+    <div class="aether-badge">NVIDIA NIM Active</div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── Render message ────────────────────────────────────────────────────────────
-
-def render_message(role: str, content: str):
+# ── Custom Renderer ───────────────────────────────────────────────────────────
+def render_message(role: str, content):
     if role == "user":
-        safe = (content
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;"))
+        # Check if content is standard text or multimodal structure
+        text_display = ""
+        if isinstance(content, list):
+            for item in content:
+                if item.get("type") == "text":
+                    text_display += item.get("text", "")
+                elif item.get("type") == "image_url":
+                    text_display += "<br>🖼️ *[Attached Base64 Inline Image]*"
+        else:
+            text_display = content
+
+        safe = (text_display.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
         safe = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', safe)
-        safe = re.sub(r'\*(.+?)\*', r'<em>\1</em>', safe)
-        safe = re.sub(r'`(.+?)`', r'<code>\1</code>', safe)
         safe = safe.replace("\n", "<br>")
-        st.markdown(f"""
-        <div class="chat-row user-row">
-            <div class="bubble user-bubble">{safe}</div>
-        </div>""", unsafe_allow_html=True)
+        st.markdown(f'<div class="chat-row user-row"><div class="bubble user-bubble">{safe}</div></div>', unsafe_allow_html=True)
     else:
         col1, col2 = st.columns([0.04, 0.96])
         with col1:
             st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
         with col2:
             st.markdown('<div class="bubble assistant-bubble">', unsafe_allow_html=True)
-            st.markdown(content, unsafe_allow_html=False)
+            
+            # Check for thinking profiles (Reasoning models like DeepSeek-R1)
+            thinking, structural_answer = parse_reasoning_content(content)
+            if thinking:
+                st.markdown(f'<div class="thinking-box">💭 <b>Thinking Process:</b><br>{thinking}</div>', unsafe_allow_html=True)
+            
+            st.markdown(structural_answer, unsafe_allow_html=False)
             st.markdown('</div>', unsafe_allow_html=True)
 
-
-def stream_response(messages: list) -> str:
-    """Stream directly from NVIDIA NIM and return the full text."""
-    client = OpenAI(
-        base_url="https://integrate.api.nvidia.com/v1",
-        api_key=API_KEY,
-    )
-
+# ── Inference Pipeline ────────────────────────────────────────────────────────
+def stream_response(messages: list, active_model: str) -> str:
+    client = get_nvidia_client()
     col1, col2 = st.columns([0.04, 0.96])
+    
     with col1:
         st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
-
     with col2:
         stream_placeholder = st.empty()
         accumulated = ""
-
-        # Using standard Llama 3.1 70B variant hosted on NVIDIA NIM
+        
         with client.chat.completions.create(
-            model="meta/llama-3.1-70b-instruct",
+            model=active_model,
             messages=messages,
             stream=True,
         ) as stream:
             for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
-                    delta = chunk.choices[0].delta.content
-                    accumulated += delta
-                    # Appends text + a sleek terminal block character cursor cleanly
-                    stream_placeholder.markdown(accumulated + "▋")
-
-        # Final render — drop the trailing cursor character
-        stream_placeholder.markdown(accumulated)
-
+                    accumulated += chunk.choices[0].delta.content
+                    
+                    # Live rendering structure mapping code tokens and formatting
+                    thinking, display_text = parse_reasoning_content(accumulated)
+                    if thinking:
+                        stream_placeholder.markdown(
+                            f'<div class="thinking-box">💭 <b>Thinking Process...</b><br>{thinking}</div>\n\n{display_text}▋', 
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        stream_placeholder.markdown(accumulated + "▋")
+                        
+        thinking, final_display = parse_reasoning_content(accumulated)
+        if thinking:
+            stream_placeholder.markdown(f'<div class="thinking-box">💭 <b>Thinking Process:</b><br>{thinking}</div>\n\n{final_display}', unsafe_allow_html=True)
+        else:
+            stream_placeholder.markdown(accumulated)
+            
     return accumulated
 
-# ── History ───────────────────────────────────────────────────────────────────
+def generate_voice_feedback(text_payload: str):
+    """Utilizes Riva/NVIDIA TTS endpoints to convert generation to audio."""
+    try:
+        client = get_nvidia_client()
+        _, clean_text = parse_reasoning_content(text_payload)
+        # Stripping out markdown tags for cleaner speech synth
+        clean_text = re.sub(r'[*`#_]', '', clean_text)[:250] 
+        
+        response = client.audio.speech.create(
+            model="nvidia/riva-tts",
+            voice="English-US-Male-1",
+            input=clean_text
+        )
+        st.audio(response.content, format="audio/wav")
+    except Exception as e:
+        st.sidebar.error(f"Audio stream error: {e}")
 
+# ── View Loop ─────────────────────────────────────────────────────────────────
 non_system = [m for m in st.session_state.messages if m["role"] != "system"]
 
 if non_system:
     col1, col2, col3 = st.columns([4, 2, 4])
     with col2:
-        if st.button("✕  Clear", key="clear_chat"):
+        if st.button("✕  Clear Canvas", key="clear_chat"):
             st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
             st.rerun()
 
     for msg in non_system:
         render_message(msg["role"], msg["content"])
 
-# ── Input & inference ─────────────────────────────────────────────────────────
-
+# ── User Action Trigger ───────────────────────────────────────────────────────
 if user_input := st.chat_input("Message Aether…"):
+    
+    # Process Multimodal payload structure if image asset is present
+    if uploaded_image:
+        base64_str = encode_image(uploaded_image)
+        mime_type = uploaded_image.type
+        current_turn_content = [
+            {"type": "text", "text": user_input},
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime_type};base64,{base64_str}"}
+            }
+        ]
+        # Force switch to vision model if user uploaded an image but forgot to switch models
+        if "vision" not in model_choice:
+            model_choice = "nvidia/cosmos-1.0-vision-70b"
+    else:
+        current_turn_content = user_input
 
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    render_message("user", user_input)
+    st.session_state.messages.append({"role": "user", "content": current_turn_content})
+    render_message("user", current_turn_content)
 
     try:
-        ai_text = stream_response(st.session_state.messages)
-        st.session_state.messages.append({"role": "assistant", "content": ai_text})
-
+        ai_output = stream_response(st.session_state.messages, model_choice)
+        st.session_state.messages.append({"role": "assistant", "content": ai_output})
+        
+        if enable_voice:
+            generate_voice_feedback(ai_output)
+            
     except Exception as exc:
-        render_message("assistant", f"**Error:** {exc}")
+        render_message("assistant", f"**Inference Exception Error:** {exc}")
