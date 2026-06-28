@@ -5,7 +5,8 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
-API_KEY = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY")
+# Update your .env or Streamlit secrets with your NVIDIA API key (starts with nvapi-)
+API_KEY = os.getenv("NVIDIA_API_KEY") or st.secrets.get("NVIDIA_API_KEY")
 
 st.set_page_config(
     page_title="Aether AI",
@@ -132,7 +133,7 @@ st.markdown("""
 .bubble.assistant-bubble p  { margin: 0 0 0.5rem; color: #8A95A3; }
 .bubble.assistant-bubble p:last-child { margin-bottom: 0; }
 .bubble.assistant-bubble strong { color: #C0C8D8; font-weight: 600; }
-.bubble.assistant-bubble em     { color: #6E7D8C; font-style: italic; }
+.bubble.assistant-bubble em      { color: #6E7D8C; font-style: italic; }
 .bubble.assistant-bubble ul, .bubble.assistant-bubble ol {
     margin: 0.35rem 0 0.35rem 1.15rem; padding: 0;
 }
@@ -188,26 +189,6 @@ st.markdown("""
 }
 .bubble.assistant-bubble th { color: #C0C8D8; background: rgba(255,255,255,0.03); }
 
-/* ── Typing animation ── */
-.typing-dots {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 8px 0;
-}
-.typing-dots span {
-    width: 5px; height: 5px;
-    background: #2D3748;
-    border-radius: 50%;
-    animation: blink 1.4s infinite ease-in-out both;
-}
-.typing-dots span:nth-child(1) { animation-delay: -0.32s; }
-.typing-dots span:nth-child(2) { animation-delay: -0.16s; }
-@keyframes blink {
-    0%, 80%, 100% { transform: scale(0.45); opacity: 0.2; }
-    40%            { transform: scale(1);    opacity: 0.85; }
-}
-
 /* ── Input ── */
 .stChatInputContainer {
     background: #0C0E17 !important;
@@ -229,7 +210,7 @@ st.markdown("""
 div[data-testid="stButton"] > button {
     background: transparent !important;
     border: 1px solid rgba(255,255,255,0.05) !important;
-    color: #2D3748 !important;
+    color: #4A5568 !important;
     font-size: 11px !important;
     border-radius: 8px !important;
     padding: 3px 12px !important;
@@ -238,7 +219,7 @@ div[data-testid="stButton"] > button {
 }
 div[data-testid="stButton"] > button:hover {
     border-color: rgba(255,255,255,0.09) !important;
-    color: #404A5A !important;
+    color: #A0AEC0 !important;
 }
 
 /* ── Divider ── */
@@ -247,32 +228,19 @@ div[data-testid="stButton"] > button:hover {
     border-top: 1px solid rgba(255,255,255,0.03);
     margin: 0.25rem 0 1.75rem;
 }
-
-/* ── Streaming cursor ── */
-.stream-cursor::after {
-    content: "▋";
-    color: #818CF8;
-    animation: cursor-blink 0.7s step-end infinite;
-    margin-left: 1px;
-    font-size: 13px;
-}
-@keyframes cursor-blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0; }
-}
 </style>
 """, unsafe_allow_html=True)
 
 # ── Guard ─────────────────────────────────────────────────────────────────────
 
 if not API_KEY:
-    st.error("🔑 API key not found. Check your `.env` file.")
+    st.error("🔑 NVIDIA API key not found. Check your environment variables.")
     st.stop()
 
 # ── Session state ─────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = (
-    "You are Aether, an elite AI intelligence engine. "
+    "You are Aether, an elite AI intelligence engine powered by NVIDIA. "
     "Be concise and precise. Use markdown for structure: bold key terms, "
     "use bullet points for lists, and fenced code blocks for code. "
     "Never pad responses with filler phrases."
@@ -320,13 +288,12 @@ def render_message(role: str, content: str):
 
 
 def stream_response(messages: list) -> str:
-    """Stream from OpenRouter and return the full assembled text."""
+    """Stream directly from NVIDIA NIM and return the full text."""
     client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
+        base_url="https://integrate.api.nvidia.com/v1",
         api_key=API_KEY,
     )
 
-    # Avatar column stays fixed; text streams into the right column
     col1, col2 = st.columns([0.04, 0.96])
     with col1:
         st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
@@ -335,26 +302,20 @@ def stream_response(messages: list) -> str:
         stream_placeholder = st.empty()
         accumulated = ""
 
+        # Using standard Llama 3.1 70B variant hosted on NVIDIA NIM
         with client.chat.completions.create(
-            model="openai/gpt-oss-120b:free",
+            model="meta/llama-3.1-70b-instruct",
             messages=messages,
             stream=True,
         ) as stream:
             for chunk in stream:
-                delta = chunk.choices[0].delta.content
-                if delta:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    delta = chunk.choices[0].delta.content
                     accumulated += delta
-                    # Show live markdown with blinking cursor appended
-                    stream_placeholder.markdown(
-                        f'<div class="bubble assistant-bubble stream-cursor">'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-                    # Render actual markdown content via st.markdown (no unsafe_allow_html
-                    # so Streamlit's markdown renderer handles code blocks, bold, etc.)
+                    # Appends text + a sleek terminal block character cursor cleanly
                     stream_placeholder.markdown(accumulated + "▋")
 
-        # Final render — drop the cursor
+        # Final render — drop the trailing cursor character
         stream_placeholder.markdown(accumulated)
 
     return accumulated
