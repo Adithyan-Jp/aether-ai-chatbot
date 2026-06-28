@@ -3,266 +3,60 @@ import re
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
+from PIL import Image
+from pydub import AudioSegment
+from moviepy.editor import VideoFileClip
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
+# Load environment variables
 load_dotenv()
-# Update your .env or Streamlit secrets with your NVIDIA API key (starts with nvapi-)
+
+# NVIDIA API key
 API_KEY = os.getenv("NVIDIA_API_KEY") or st.secrets.get("NVIDIA_API_KEY")
 
+# Streamlit configuration
 st.set_page_config(
     page_title="Aether AI",
-    page_icon="✨",
+    page_icon="",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
 
+# Custom styles
 st.markdown("""
 <style>
-/* ── Base ── */
-.stApp, html, body, [data-testid="stAppViewContainer"] {
-    background: #07080D !important;
-}
-.main .block-container {
-    max-width: 720px !important;
-    padding-top: 0 !important;
-    padding-bottom: 8rem !important;
-}
-#MainMenu, footer, header { visibility: hidden; }
-
-/* ── Header ── */
-.aether-header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 0;
-    margin-bottom: 2rem;
-    background: #07080D;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-}
-.aether-brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.aether-logo {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    background: rgba(99,102,241,0.12);
-    border: 1px solid rgba(99,102,241,0.18);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-}
-.aether-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: #D0D4E0;
-    letter-spacing: -0.2px;
-}
-.aether-badge {
-    font-size: 9px;
-    font-weight: 600;
-    color: #38A169;
-    background: rgba(56,161,105,0.08);
-    border: 1px solid rgba(56,161,105,0.18);
-    border-radius: 20px;
-    padding: 2px 8px;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-}
-
-/* ── Chat rows ── */
-.chat-row {
-    display: flex;
-    width: 100%;
-    margin-bottom: 1.5rem;
-    gap: 10px;
-    align-items: flex-start;
-}
-.chat-row.user-row    { justify-content: flex-end; }
-.chat-row.assistant-row { justify-content: flex-start; }
-
-/* ── Avatars ── */
-.avatar {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    font-size: 11px;
-    font-weight: 600;
-    margin-top: 3px;
-}
-.avatar.ai {
-    background: rgba(99,102,241,0.12);
-    border: 1px solid rgba(99,102,241,0.2);
-    color: #818CF8;
-}
-.avatar.user {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #606880;
-}
-
-/* ── Bubbles ── */
-.bubble {
-    max-width: 80%;
-    font-size: 14.5px;
-    line-height: 1.75;
-    word-wrap: break-word;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-.bubble.user-bubble {
-    background: #111420;
-    border: 1px solid rgba(255,255,255,0.055);
-    color: #BFC6D6;
-    border-radius: 16px 16px 3px 16px;
-    padding: 0.65rem 1rem;
-}
-.bubble.assistant-bubble {
-    background: transparent;
-    color: #7E8A99;
-    padding: 0.1rem 0;
-}
-.bubble.assistant-bubble p  { margin: 0 0 0.5rem; color: #8A95A3; }
-.bubble.assistant-bubble p:last-child { margin-bottom: 0; }
-.bubble.assistant-bubble strong { color: #C0C8D8; font-weight: 600; }
-.bubble.assistant-bubble em      { color: #6E7D8C; font-style: italic; }
-.bubble.assistant-bubble ul, .bubble.assistant-bubble ol {
-    margin: 0.35rem 0 0.35rem 1.15rem; padding: 0;
-}
-.bubble.assistant-bubble li { margin-bottom: 4px; color: #8A95A3; }
-.bubble.assistant-bubble h1, .bubble.assistant-bubble h2, .bubble.assistant-bubble h3 {
-    color: #C0C8D8; font-weight: 600; margin: 0.8rem 0 0.35rem;
-}
-.bubble.assistant-bubble h1 { font-size: 17px; }
-.bubble.assistant-bubble h2 { font-size: 15px; }
-.bubble.assistant-bubble h3 { font-size: 14px; }
-.bubble.assistant-bubble code {
-    background: #0D0F18;
-    border: 1px solid rgba(255,255,255,0.07);
-    padding: 2px 6px;
-    border-radius: 5px;
-    font-family: "Fira Code", "JetBrains Mono", monospace;
-    font-size: 12.5px;
-    color: #7EB8D4;
-}
-.bubble.assistant-bubble pre {
-    background: #0A0C14;
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px;
-    padding: 0.9rem 1.1rem;
-    overflow-x: auto;
-    margin: 0.75rem 0;
-}
-.bubble.assistant-bubble pre code {
-    background: none; border: none; padding: 0;
-    color: #9BAFC0; font-size: 12.5px;
-}
-.bubble.assistant-bubble blockquote {
-    border-left: 2px solid rgba(99,102,241,0.3);
-    margin: 0.5rem 0;
-    padding-left: 0.9rem;
-    color: #6E7D8C;
-}
-.bubble.assistant-bubble hr {
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    margin: 0.75rem 0;
-}
-.bubble.assistant-bubble table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 13px;
-    margin: 0.5rem 0;
-}
-.bubble.assistant-bubble th, .bubble.assistant-bubble td {
-    border: 1px solid rgba(255,255,255,0.07);
-    padding: 6px 10px;
-    text-align: left;
-}
-.bubble.assistant-bubble th { color: #C0C8D8; background: rgba(255,255,255,0.03); }
-
-/* ── Input ── */
-.stChatInputContainer {
-    background: #0C0E17 !important;
-    border: 1px solid rgba(255,255,255,0.07) !important;
-    border-radius: 14px !important;
-    box-shadow: 0 0 0 1px rgba(99,102,241,0.04) !important;
-    transition: border-color 0.2s !important;
-}
-.stChatInputContainer:focus-within {
-    border-color: rgba(99,102,241,0.2) !important;
-}
-.stChatInputContainer textarea {
-    color: #C8CEDB !important;
-    font-size: 14px !important;
-    background: transparent !important;
-}
-
-/* ── Clear button ── */
-div[data-testid="stButton"] > button {
-    background: transparent !important;
-    border: 1px solid rgba(255,255,255,0.05) !important;
-    color: #4A5568 !important;
-    font-size: 11px !important;
-    border-radius: 8px !important;
-    padding: 3px 12px !important;
-    letter-spacing: 0.3px;
-    transition: all 0.15s !important;
-}
-div[data-testid="stButton"] > button:hover {
-    border-color: rgba(255,255,255,0.09) !important;
-    color: #A0AEC0 !important;
-}
-
-/* ── Divider ── */
-.msg-divider {
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.03);
-    margin: 0.25rem 0 1.75rem;
-}
+/* ... */
 </style>
 """, unsafe_allow_html=True)
 
-# ── Guard ─────────────────────────────────────────────────────────────────────
-
+# Guard
 if not API_KEY:
-    st.error("🔑 NVIDIA API key not found. Check your environment variables.")
+    st.error("")
     st.stop()
 
-# ── Session state ─────────────────────────────────────────────────────────────
-
+# Session state
 SYSTEM_PROMPT = (
     "You are Aether, an elite AI intelligence engine powered by NVIDIA. "
     "Be concise and precise. Use markdown for structure: bold key terms, "
     "use bullet points for lists, and fenced code blocks for code. "
     "Never pad responses with filler phrases."
 )
-
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-# ── Header ────────────────────────────────────────────────────────────────────
-
+# Header
 st.markdown("""
 <div class="aether-header">
     <div class="aether-brand">
-        <div class="aether-logo">✨</div>
+        <div class="aether-logo"></div>
         <div class="aether-title">Aether</div>
     </div>
     <div class="aether-badge">Online</div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── Render message ────────────────────────────────────────────────────────────
-
+# Render message
 def render_message(role: str, content: str):
     if role == "user":
         safe = (content
@@ -274,9 +68,10 @@ def render_message(role: str, content: str):
         safe = re.sub(r'`(.+?)`', r'<code>\1</code>', safe)
         safe = safe.replace("\n", "<br>")
         st.markdown(f"""
-        <div class="chat-row user-row">
-            <div class="bubble user-bubble">{safe}</div>
-        </div>""", unsafe_allow_html=True)
+<div class="chat-row user-row">
+    <div class="bubble user-bubble">{safe}</div>
+</div>
+""", unsafe_allow_html=True)
     else:
         col1, col2 = st.columns([0.04, 0.96])
         with col1:
@@ -286,64 +81,81 @@ def render_message(role: str, content: str):
             st.markdown(content, unsafe_allow_html=False)
             st.markdown('</div>', unsafe_allow_html=True)
 
-
-def stream_response(messages: list) -> str:
-    """Stream directly from NVIDIA NIM and return the full text."""
+# Stream response
+def stream_response(messages: list, input_type: str) -> str:
     client = OpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
         api_key=API_KEY,
     )
-
     col1, col2 = st.columns([0.04, 0.96])
     with col1:
         st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
-
     with col2:
         stream_placeholder = st.empty()
         accumulated = ""
+        if input_type == "audio":
+            audio_file = messages[-1]["content"]
+            response = client.audio.analyze(audio_file)
+        elif input_type == "image":
+            image_file = messages[-1]["content"]
+            response = client.image.analyze(image_file)
+        elif input_type == "text":
+            text_input = messages[-1]["content"]
+            response = client.text.analyze(text_input)
+        elif input_type == "video":
+            video_file = messages[-1]["content"]
+            response = client.video.analyze(video_file)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return None
 
-        # Using standard Llama 3.1 70B variant hosted on NVIDIA NIM
-        with client.chat.completions.create(
-            model="meta/llama-3.1-70b-instruct",
-            messages=messages,
-            stream=True,
-        ) as stream:
-            for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    delta = chunk.choices[0].delta.content
-                    accumulated += delta
-                    # Appends text + a sleek terminal block character cursor cleanly
-                    stream_placeholder.markdown(accumulated + "▋")
+# Audio input
+audio_file = st.file_uploader("Upload audio file")
+if audio_file:
+    audio = AudioSegment.from_file(audio_file)
+    st.audio(audio)
 
-        # Final render — drop the trailing cursor character
-        stream_placeholder.markdown(accumulated)
+# Image input
+image_file = st.file_uploader("Upload image file")
+if image_file:
+    image = Image.open(image_file)
+    st.image(image)
 
-    return accumulated
+# Reasoning task
+reasoning_task = st.selectbox("Select reasoning task", ["Task 1", "Task 2"])
+if reasoning_task:
+    model = AutoModelForSeq2SeqLM.from_pretrained("t5-base")
+    tokenizer = AutoTokenizer.from_pretrained("t5-base")
+    input_text = st.text_input("Enter input text")
+    if input_text:
+        inputs = tokenizer.encode(input_text, return_tensors="pt")
+        outputs = model.generate(inputs)
+        st.write(tokenizer.decode(outputs[0]))
 
-# ── History ───────────────────────────────────────────────────────────────────
+# Text input
+text_input = st.text_input("Enter text input")
+if text_input:
+    api_response = stream_response(st.session_state.messages + [{"role": "user", "content": text_input}], "text")
+    st.write(api_response)
 
-non_system = [m for m in st.session_state.messages if m["role"] != "system"]
+# Video input
+video_file = st.file_uploader("Upload video file")
+if video_file:
+    video = VideoFileClip(video_file)
+    st.video(video)
 
-if non_system:
-    col1, col2, col3 = st.columns([4, 2, 4])
-    with col2:
-        if st.button("✕  Clear", key="clear_chat"):
-            st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-            st.rerun()
-
-    for msg in non_system:
+# Chat interface
+if st.session_state.messages:
+    for msg in st.session_state.messages:
         render_message(msg["role"], msg["content"])
 
-# ── Input & inference ─────────────────────────────────────────────────────────
-
+# Input & inference
 if user_input := st.chat_input("Message Aether…"):
-
     st.session_state.messages.append({"role": "user", "content": user_input})
     render_message("user", user_input)
-
     try:
-        ai_text = stream_response(st.session_state.messages)
+        ai_text = stream_response(st.session_state.messages, "text")
         st.session_state.messages.append({"role": "assistant", "content": ai_text})
-
     except Exception as exc:
         render_message("assistant", f"**Error:** {exc}")
