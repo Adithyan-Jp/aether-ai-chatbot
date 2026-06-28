@@ -1,5 +1,7 @@
 import os
 import re
+import base64
+import io
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -73,6 +75,54 @@ st.markdown("""
     padding: 2px 8px;
     letter-spacing: 0.8px;
     text-transform: uppercase;
+}
+
+/* ── Mode selector ── */
+.mode-pill {
+    display: inline-flex;
+    gap: 6px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 1.5rem;
+}
+.mode-btn {
+    font-size: 12px;
+    font-weight: 500;
+    color: #606880;
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.mode-btn:hover { color: #A0AEC0; }
+.mode-btn.active {
+    background: rgba(99,102,241,0.12);
+    color: #818CF8;
+    border: 1px solid rgba(99,102,241,0.18);
+}
+
+/* ── Upload area ── */
+.upload-area {
+    background: rgba(255,255,255,0.02);
+    border: 1px dashed rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+.upload-area p {
+    color: #4A5568;
+    font-size: 12px;
+    margin: 0;
+}
+.upload-preview {
+    border-radius: 10px;
+    max-width: 100%;
+    margin-top: 0.5rem;
 }
 
 /* ── Chat rows ── */
@@ -228,6 +278,12 @@ div[data-testid="stButton"] > button:hover {
     border-top: 1px solid rgba(255,255,255,0.03);
     margin: 0.25rem 0 1.75rem;
 }
+
+/* ── Sidebar tweaks ── */
+[data-testid="stSidebar"] {
+    background: #0A0C14 !important;
+}
+[data-testid="stSidebar"] .stMarkdown { color: #8A95A3; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -236,6 +292,36 @@ div[data-testid="stButton"] > button:hover {
 if not API_KEY:
     st.error("🔑 NVIDIA API key not found. Check your environment variables.")
     st.stop()
+
+# ── Model registry ───────────────────────────────────────────────────────────
+
+MODELS = {
+    "text": {
+        "id": "meta/llama-3.3-70b-instruct",
+        "name": "Llama 3.3 70B",
+        "desc": "General-purpose text chat & code",
+    },
+    "reasoning": {
+        "id": "deepseek/deepseek-r1",
+        "name": "DeepSeek-R1",
+        "desc": "Chain-of-thought reasoning & math",
+    },
+    "image": {
+        "id": "nvidia/nemotron-3-nano-2-vl",
+        "name": "Nemotron Nano 2 VL",
+        "desc": "Vision-language: images + text",
+    },
+    "video": {
+        "id": "nvidia/nemotron-3-nano-omni",
+        "name": "Nemotron 3 Omni",
+        "desc": "Video + image + text understanding",
+    },
+    "audio": {
+        "id": "nvidia/nemotron-3-nano-omni",
+        "name": "Nemotron 3 Omni",
+        "desc": "Audio + speech + text understanding",
+    },
+}
 
 # ── Session state ─────────────────────────────────────────────────────────────
 
@@ -248,6 +334,48 @@ SYSTEM_PROMPT = (
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+if "mode" not in st.session_state:
+    st.session_state.mode = "text"
+if "uploaded_media" not in st.session_state:
+    st.session_state.uploaded_media = None   # dict: {type, mime, data, ext}
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def file_to_base64(file_bytes: bytes, mime: str) -> str:
+    b64 = base64.b64encode(file_bytes).decode("utf-8")
+    return f"data:{mime};base64,{b64}"
+
+
+def build_content(text: str, media: dict | None) -> list | str:
+    """Build OpenAI-compatible content array for multimodal messages."""
+    if not media:
+        return text
+
+    content = []
+    if text:
+        content.append({"type": "text", "text": text})
+
+    mtype = media["type"]
+    mime = media["mime"]
+    b64_url = media["data"]
+
+    if mtype == "image":
+        content.append({"type": "image_url", "image_url": {"url": b64_url}})
+    elif mtype == "audio":
+        # Nemotron Omni accepts audio via base64 data URLs in content
+        content.append({"type": "audio_url", "audio_url": {"url": b64_url}})
+    elif mtype == "video":
+        # For video, we send as image_url with a data URL (NIM VLM/Omni handles it)
+        content.append({"type": "video_url", "video_url": {"url": b64_url}})
+    return content
+
+
+def get_model_for_mode(mode: str) -> str:
+    return MODELS[mode]["id"]
+
+
+def reset_media():
+    st.session_state.uploaded_media = None
 
 # ── Header ────────────────────────────────────────────────────────────────────
 
@@ -261,17 +389,94 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Render message ────────────────────────────────────────────────────────────
+# ── Mode selector ─────────────────────────────────────────────────────────────
 
-def render_message(role: str, content: str):
+modes = ["text", "image", "audio", "video", "reasoning"]
+mode_labels = {
+    "text": "💬 Text",
+    "image": "🖼️ Image",
+    "audio": "🎙️ Audio",
+    "video": "🎬 Video",
+    "reasoning": "🧠 Reasoning",
+}
+
+cols = st.columns(len(modes))
+for i, m in enumerate(modes):
+    active = st.session_state.mode == m
+    cls = "mode-btn active" if active else "mode-btn"
+    if cols[i].button(mode_labels[m], key=f"mode_{m}", use_container_width=True):
+        st.session_state.mode = m
+        reset_media()
+        st.rerun()
+
+# ── File uploaders per mode ─────────────────────────────────────────────────
+
+mode = st.session_state.mode
+uploaded = None
+
+if mode == "image":
+    uploaded = st.file_uploader(
+        "Upload an image (PNG, JPG, WEBP)",
+        type=["png", "jpg", "jpeg", "webp"],
+        key="img_uploader",
+    )
+elif mode == "audio":
+    uploaded = st.file_uploader(
+        "Upload audio (MP3, WAV, OGG, M4A)",
+        type=["mp3", "wav", "ogg", "m4a", "flac"],
+        key="audio_uploader",
+    )
+elif mode == "video":
+    uploaded = st.file_uploader(
+        "Upload video (MP4, MOV, WEBM, AVI)",
+        type=["mp4", "mov", "webm", "avi", "mkv"],
+        key="video_uploader",
+    )
+
+if uploaded is not None:
+    bytes_data = uploaded.read()
+    mime = uploaded.type
+    ext = uploaded.name.split(".")[-1].lower()
+    b64_url = file_to_base64(bytes_data, mime)
+    st.session_state.uploaded_media = {
+        "type": mode,
+        "mime": mime,
+        "data": b64_url,
+        "ext": ext,
+        "name": uploaded.name,
+    }
+
+# Show preview of uploaded media
+media = st.session_state.uploaded_media
+if media:
+    if media["type"] == "image":
+        st.markdown(f'<img src="{media["data"]}" class="upload-preview" style="max-height:260px;">', unsafe_allow_html=True)
+    elif media["type"] == "audio":
+        st.audio(media["data"])
+    elif media["type"] == "video":
+        st.video(media["data"])
+    if st.button("✕ Remove attachment", key="remove_media"):
+        reset_media()
+        st.rerun()
+
+# ── Render message ───────────────────────────────────────────────────────────
+
+def render_message(role: str, content):
     if role == "user":
-        safe = (content
+        # Extract text from multimodal content
+        if isinstance(content, list):
+            text_parts = [c["text"] for c in content if c.get("type") == "text"]
+            display_text = " ".join(text_parts) if text_parts else "[multimodal]"
+        else:
+            display_text = content
+
+        safe = (display_text
                 .replace("&", "&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;"))
-        safe = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', safe)
-        safe = re.sub(r'\*(.+?)\*', r'<em>\1</em>', safe)
-        safe = re.sub(r'`(.+?)`', r'<code>\1</code>', safe)
+        safe = re.sub(r'\*\*(.+?)\*\*', r'<strong></strong>', safe)
+        safe = re.sub(r'\*(.+?)\*', r'<em></em>', safe)
+        safe = re.sub(r'`(.+?)`', r'<code></code>', safe)
         safe = safe.replace("\n", "<br>")
         st.markdown(f"""
         <div class="chat-row user-row">
@@ -287,7 +492,7 @@ def render_message(role: str, content: str):
             st.markdown('</div>', unsafe_allow_html=True)
 
 
-def stream_response(messages: list) -> str:
+def stream_response(messages: list, model_id: str) -> str:
     """Stream directly from NVIDIA NIM and return the full text."""
     client = OpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
@@ -302,9 +507,8 @@ def stream_response(messages: list) -> str:
         stream_placeholder = st.empty()
         accumulated = ""
 
-        # Using standard Llama 3.1 70B variant hosted on NVIDIA NIM
         with client.chat.completions.create(
-            model="meta/llama-3.1-70b-instruct",
+            model=model_id,
             messages=messages,
             stream=True,
         ) as stream:
@@ -312,10 +516,8 @@ def stream_response(messages: list) -> str:
                 if chunk.choices and chunk.choices[0].delta.content:
                     delta = chunk.choices[0].delta.content
                     accumulated += delta
-                    # Appends text + a sleek terminal block character cursor cleanly
                     stream_placeholder.markdown(accumulated + "▋")
 
-        # Final render — drop the trailing cursor character
         stream_placeholder.markdown(accumulated)
 
     return accumulated
@@ -329,6 +531,7 @@ if non_system:
     with col2:
         if st.button("✕  Clear", key="clear_chat"):
             st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            reset_media()
             st.rerun()
 
     for msg in non_system:
@@ -336,14 +539,30 @@ if non_system:
 
 # ── Input & inference ─────────────────────────────────────────────────────────
 
-if user_input := st.chat_input("Message Aether…"):
+placeholder_text = {
+    "text": "Message Aether…",
+    "image": "Ask about this image…",
+    "audio": "Ask about this audio…",
+    "video": "Ask about this video…",
+    "reasoning": "Ask a reasoning question…",
+}
 
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    render_message("user", user_input)
+if user_input := st.chat_input(placeholder_text[mode]):
+    model_id = get_model_for_mode(mode)
+    content = build_content(user_input, media)
+
+    st.session_state.messages.append({"role": "user", "content": content})
+    render_message("user", content)
+
+    # For non-text modes, inject a brief system hint about the modality
+    messages = list(st.session_state.messages)
+    if mode != "text":
+        # Prepend a temporary context hint (not stored in session)
+        hint = f"The user has uploaded a {mode} file. Analyze it carefully."
+        messages = [{"role": "system", "content": SYSTEM_PROMPT + " " + hint}] + messages[1:]
 
     try:
-        ai_text = stream_response(st.session_state.messages)
+        ai_text = stream_response(messages, model_id)
         st.session_state.messages.append({"role": "assistant", "content": ai_text})
-
     except Exception as exc:
         render_message("assistant", f"**Error:** {exc}")
