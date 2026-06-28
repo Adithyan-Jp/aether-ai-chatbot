@@ -294,16 +294,18 @@ if not API_KEY:
     st.stop()
 
 # ── Model registry ───────────────────────────────────────────────────────────
+# Primary model: nvidia/nemotron-3-ultra-550b-a55b:free (text / reasoning / coding)
+# Multimodal models kept for image, audio, and video modes
 
 MODELS = {
     "text": {
-        "id": "meta/llama-3.1-70b-instruct",
-        "name": "Llama 3.1 70B",
+        "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "name": "Nemotron 3 Ultra 550B",
         "desc": "General-purpose text chat & code",
     },
     "reasoning": {
-        "id": "deepseek-ai/deepseek-r1",
-        "name": "DeepSeek-R1",
+        "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "name": "Nemotron 3 Ultra 550B",
         "desc": "Chain-of-thought reasoning & math",
     },
     "image": {
@@ -321,15 +323,27 @@ MODELS = {
         "name": "Nemotron 3 Nano Omni",
         "desc": "Audio + speech + text understanding",
     },
+    "coding": {
+        "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "name": "Nemotron 3 Ultra 550B",
+        "desc": "Fast coding, functions, bug fixes",
+    },
 }
 
 # ── Session state ─────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = (
-    "You are Aether, an elite AI intelligence engine powered by NVIDIA. "
+    "You are Aether, an elite AI intelligence engine powered by NVIDIA Nemotron 3 Ultra. "
     "Be concise and precise. Use markdown for structure: bold key terms, "
     "use bullet points for lists, and fenced code blocks for code. "
     "Never pad responses with filler phrases."
+)
+
+CODING_SYSTEM_PROMPT = (
+    "You are Aether Code, an expert programming assistant powered by NVIDIA Nemotron 3 Ultra. "
+    "Write clean, well-documented code. Always include type hints and docstrings. "
+    "Explain your reasoning briefly before showing code. "
+    "Use best practices and modern language features."
 )
 
 if "messages" not in st.session_state:
@@ -374,6 +388,12 @@ def get_model_for_mode(mode: str) -> str:
     return MODELS[mode]["id"]
 
 
+def get_system_prompt(mode: str) -> str:
+    if mode == "coding":
+        return CODING_SYSTEM_PROMPT
+    return SYSTEM_PROMPT
+
+
 def reset_media():
     st.session_state.uploaded_media = None
 
@@ -391,13 +411,14 @@ st.markdown("""
 
 # ── Mode selector ─────────────────────────────────────────────────────────────
 
-modes = ["text", "image", "audio", "video", "reasoning"]
+modes = ["text", "image", "audio", "video", "reasoning", "coding"]
 mode_labels = {
     "text": "💬 Text",
     "image": "🖼️ Image",
     "audio": "🎙️ Audio",
     "video": "🎬 Video",
     "reasoning": "🧠 Reasoning",
+    "coding": "💻 Coding",
 }
 
 cols = st.columns(len(modes))
@@ -406,6 +427,11 @@ for i, m in enumerate(modes):
     cls = "mode-btn active" if active else "mode-btn"
     if cols[i].button(mode_labels[m], key=f"mode_{m}", use_container_width=True):
         st.session_state.mode = m
+        # Update system prompt when switching modes
+        st.session_state.messages[0] = {
+            "role": "system",
+            "content": get_system_prompt(m)
+        }
         reset_media()
         st.rerun()
 
@@ -530,7 +556,7 @@ if non_system:
     col1, col2, col3 = st.columns([4, 2, 4])
     with col2:
         if st.button("✕  Clear", key="clear_chat"):
-            st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            st.session_state.messages = [{"role": "system", "content": get_system_prompt(mode)}]
             reset_media()
             st.rerun()
 
@@ -545,6 +571,7 @@ placeholder_text = {
     "audio": "Ask about this audio…",
     "video": "Ask about this video…",
     "reasoning": "Ask a reasoning question…",
+    "coding": "Write code, debug, or explain…",
 }
 
 if user_input := st.chat_input(placeholder_text[mode]):
@@ -556,10 +583,10 @@ if user_input := st.chat_input(placeholder_text[mode]):
 
     # For non-text modes, inject a brief system hint about the modality
     messages = list(st.session_state.messages)
-    if mode != "text":
+    if mode in ("image", "audio", "video"):
         # Prepend a temporary context hint (not stored in session)
         hint = f"The user has uploaded a {mode} file. Analyze it carefully."
-        messages = [{"role": "system", "content": SYSTEM_PROMPT + " " + hint}] + messages[1:]
+        messages = [{"role": "system", "content": get_system_prompt(mode) + " " + hint}] + messages[1:]
 
     try:
         ai_text = stream_response(messages, model_id)
