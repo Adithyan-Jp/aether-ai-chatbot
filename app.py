@@ -1,7 +1,5 @@
 import os
 import re
-import base64
-import io
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -290,12 +288,10 @@ div[data-testid="stButton"] > button:hover {
 # ── Guard ─────────────────────────────────────────────────────────────────────
 
 if not API_KEY:
-    st.error("🔑 OpenRouter API key not found. Check your environment variables.")
+    st.error("🔑 OpenRouter API key not found. Check your environment variables or Streamlit secrets.")
     st.stop()
 
 # ── Model registry ───────────────────────────────────────────────────────────
-# OpenRouter model IDs (from build.nvidia.com via OpenRouter)
-# Format: developer/model-name (as shown on OpenRouter model pages)
 
 MODELS = {
     "text": {
@@ -381,6 +377,8 @@ for i, m in enumerate(modes):
         }
         st.rerun()
 
+mode = st.session_state.mode
+
 # ── Render message ───────────────────────────────────────────────────────────
 
 def render_message(role: str, content):
@@ -392,7 +390,7 @@ def render_message(role: str, content):
         safe = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', safe)
         safe = re.sub(r'\*(.+?)\*', r'<em>\1</em>', safe)
         safe = re.sub(r'`(.+?)`', r'<code>\1</code>', safe)
-        safe = safe.replace("\\n", "<br>")
+        safe = safe.replace("\n", "<br>")
         st.markdown(f"""
         <div class="chat-row user-row">
             <div class="bubble user-bubble">{safe}</div>
