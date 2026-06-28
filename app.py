@@ -7,8 +7,8 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
-# Update your .env or Streamlit secrets with your OpenRouter API key (starts with sk-or-)
-API_KEY = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY")
+# Update your .env or Streamlit secrets with your NVIDIA API key (starts with nvapi-)
+API_KEY = os.getenv("NVIDIA_API_KEY") or st.secrets.get("NVIDIA_API_KEY")
 
 st.set_page_config(
     page_title="Aether AI",
@@ -174,11 +174,13 @@ st.markdown("""
     color: #BFC6D6;
     border-radius: 16px 16px 3px 16px;
     padding: 0.65rem 1rem;
+    white-space: pre-wrap;
 }
 .bubble.assistant-bubble {
     background: transparent;
     color: #7E8A99;
     padding: 0.1rem 0;
+    width: 100%;
 }
 .bubble.assistant-bubble p  { margin: 0 0 0.5rem; color: #8A95A3; }
 .bubble.assistant-bubble p:last-child { margin-bottom: 0; }
@@ -290,57 +292,45 @@ div[data-testid="stButton"] > button:hover {
 # ── Guard ─────────────────────────────────────────────────────────────────────
 
 if not API_KEY:
-    st.error("🔑 OpenRouter API key not found. Check your environment variables.")
+    st.error("🔑 NVIDIA API key not found. Check your environment variables (NVIDIA_API_KEY).")
     st.stop()
 
 # ── Model registry ───────────────────────────────────────────────────────────
-# OpenRouter model IDs (from build.nvidia.com via OpenRouter)
-# Format: developer/model-name (as shown on OpenRouter model pages)
-
+# Native production slugs for NVIDIA API catalog
 MODELS = {
     "text": {
-        "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
-        "name": "Nemotron 3 Ultra 550B",
-        "desc": "General-purpose text chat & code",
+        "id": "nvidia/llama-3.1-nemotron-70b-instruct",
+        "name": "NVIDIA Nemotron 70B",
+        "desc": "General-purpose text chat & structure generation",
     },
     "reasoning": {
-        "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
-        "name": "Nemotron 3 Ultra 550B",
-        "desc": "Chain-of-thought reasoning & math",
+        "id": "nvidia/llama-3.1-nemotron-70b-instruct", 
+        "name": "NVIDIA Nemotron 70B",
+        "desc": "Complex textual inference & instruction following",
     },
     "image": {
-        "id": "google/gemini-2.0-flash-001",
-        "name": "Gemini 2.0 Flash",
-        "desc": "Vision-language: images + text",
-    },
-    "video": {
-        "id": "google/gemini-2.0-flash-001",
-        "name": "Gemini 2.0 Flash",
-        "desc": "Video + image + audio + text understanding",
-    },
-    "audio": {
-        "id": "google/gemini-2.0-flash-001",
-        "name": "Gemini 2.0 Flash",
-        "desc": "Audio + speech + text understanding",
+        "id": "nvidia/neva-22b",
+        "name": "NVIDIA Neva 22B",
+        "desc": "Vision-Language pipeline for images",
     },
     "coding": {
-        "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
-        "name": "Nemotron 3 Ultra 550B",
-        "desc": "Fast coding, functions, bug fixes",
+        "id": "nvidia/llama-3.1-nemotron-70b-instruct",
+        "name": "NVIDIA Nemotron 70B",
+        "desc": "Advanced contextual coding, reviews, and bugs",
     },
 }
 
 # ── Session state ─────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = (
-    "You are Aether, an elite AI intelligence engine powered by NVIDIA Nemotron 3 Ultra via OpenRouter. "
+    "You are Aether, an elite AI intelligence engine running natively on NVIDIA NIM architecture. "
     "Be concise and precise. Use markdown for structure: bold key terms, "
     "use bullet points for lists, and fenced code blocks for code. "
     "Never pad responses with filler phrases."
 )
 
 CODING_SYSTEM_PROMPT = (
-    "You are Aether Code, an expert programming assistant powered by NVIDIA Nemotron 3 Ultra via OpenRouter. "
+    "You are Aether Code, an expert programming assistant running natively on NVIDIA NIM infrastructure. "
     "Write clean, well-documented code. Always include type hints and docstrings. "
     "Explain your reasoning briefly before showing code. "
     "Use best practices and modern language features."
@@ -351,7 +341,7 @@ if "messages" not in st.session_state:
 if "mode" not in st.session_state:
     st.session_state.mode = "text"
 if "uploaded_media" not in st.session_state:
-    st.session_state.uploaded_media = None   # dict: {type, mime, data, ext}
+    st.session_state.uploaded_media = None
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -361,7 +351,7 @@ def file_to_base64(file_bytes: bytes, mime: str) -> str:
 
 
 def build_content(text: str, media: dict | None) -> list | str:
-    """Build OpenAI-compatible content array for multimodal messages."""
+    """Build NVIDIA API compatible multimodal format."""
     if not media:
         return text
 
@@ -369,18 +359,9 @@ def build_content(text: str, media: dict | None) -> list | str:
     if text:
         content.append({"type": "text", "text": text})
 
-    mtype = media["type"]
-    mime = media["mime"]
-    b64_url = media["data"]
-
-    if mtype == "image":
-        content.append({"type": "image_url", "image_url": {"url": b64_url}})
-    elif mtype == "audio":
-        # OpenRouter accepts audio via input_audio content type
-        content.append({"type": "input_audio", "input_audio": {"data": b64_url.split(",")[1], "format": media["ext"]}})
-    elif mtype == "video":
-        # OpenRouter accepts video via video_url content type
-        content.append({"type": "video_url", "video_url": {"url": b64_url}})
+    if media["type"] == "image":
+        content.append({"type": "image_url", "image_url": {"url": media["data"]}})
+    
     return content
 
 
@@ -403,20 +384,19 @@ st.markdown("""
 <div class="aether-header">
     <div class="aether-brand">
         <div class="aether-logo">✨</div>
-        <div class="aether-title">Aether</div>
+        <div class="aether-title">Aether (NVIDIA NIM)</div>
     </div>
     <div class="aether-badge">Online</div>
 </div>
 """, unsafe_allow_html=True)
 
 # ── Mode selector ─────────────────────────────────────────────────────────────
+# Adjusted dynamically to reflect native NVIDIA cloud capabilities
 
-modes = ["text", "image", "audio", "video", "reasoning", "coding"]
+modes = ["text", "image", "reasoning", "coding"]
 mode_labels = {
     "text": "💬 Text",
-    "image": "🖼️ Image",
-    "audio": "🎙️ Audio",
-    "video": "🎬 Video",
+    "image": "🖼️ Vision",
     "reasoning": "🧠 Reasoning",
     "coding": "💻 Coding",
 }
@@ -424,10 +404,8 @@ mode_labels = {
 cols = st.columns(len(modes))
 for i, m in enumerate(modes):
     active = st.session_state.mode == m
-    cls = "mode-btn active" if active else "mode-btn"
     if cols[i].button(mode_labels[m], key=f"mode_{m}", use_container_width=True):
         st.session_state.mode = m
-        # Update system prompt when switching modes
         st.session_state.messages[0] = {
             "role": "system",
             "content": get_system_prompt(m)
@@ -445,18 +423,6 @@ if mode == "image":
         "Upload an image (PNG, JPG, WEBP)",
         type=["png", "jpg", "jpeg", "webp"],
         key="img_uploader",
-    )
-elif mode == "audio":
-    uploaded = st.file_uploader(
-        "Upload audio (MP3, WAV, OGG, M4A)",
-        type=["mp3", "wav", "ogg", "m4a", "flac"],
-        key="audio_uploader",
-    )
-elif mode == "video":
-    uploaded = st.file_uploader(
-        "Upload video (MP4, MOV, WEBM, AVI)",
-        type=["mp4", "mov", "webm", "avi", "mkv"],
-        key="video_uploader",
     )
 
 if uploaded is not None:
@@ -477,10 +443,6 @@ media = st.session_state.uploaded_media
 if media:
     if media["type"] == "image":
         st.markdown(f'<img src="{media["data"]}" class="upload-preview" style="max-height:260px;">', unsafe_allow_html=True)
-    elif media["type"] == "audio":
-        st.audio(media["data"])
-    elif media["type"] == "video":
-        st.video(media["data"])
     if st.button("✕ Remove attachment", key="remove_media"):
         reset_media()
         st.rerun()
@@ -489,7 +451,6 @@ if media:
 
 def render_message(role: str, content):
     if role == "user":
-        # Extract text from multimodal content
         if isinstance(content, list):
             text_parts = [c["text"] for c in content if c.get("type") == "text"]
             display_text = " ".join(text_parts) if text_parts else "[multimodal]"
@@ -500,10 +461,7 @@ def render_message(role: str, content):
                 .replace("&", "&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;"))
-        safe = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', safe)
-        safe = re.sub(r'\*(.+?)\*', r'<em>\1</em>', safe)
-        safe = re.sub(r'`(.+?)`', r'<code>\1</code>', safe)
-        safe = safe.replace("\\n", "<br>")
+        
         st.markdown(f"""
         <div class="chat-row user-row">
             <div class="bubble user-bubble">{safe}</div>
@@ -519,14 +477,10 @@ def render_message(role: str, content):
 
 
 def stream_response(messages: list, model_id: str) -> str:
-    """Stream directly from OpenRouter and return the full text."""
+    """Stream directly from native NVIDIA NIM API Gateway."""
     client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=API_KEY,
-        default_headers={
-            "HTTP-Referer": "https://aether-ai.app",
-            "X-Title": "Aether AI",
-        },
+        base_url="https://integrate.api.nvidia.com/v1",
+        api_key=API_KEY
     )
 
     col1, col2 = st.columns([0.04, 0.96])
@@ -570,12 +524,10 @@ if non_system:
 # ── Input & inference ─────────────────────────────────────────────────────────
 
 placeholder_text = {
-    "text": "Message Aether…",
+    "text": "Message Nemotron…",
     "image": "Ask about this image…",
-    "audio": "Ask about this audio…",
-    "video": "Ask about this video…",
-    "reasoning": "Ask a reasoning question…",
-    "coding": "Write code, debug, or explain…",
+    "reasoning": "Ask a hard logical/coding problem…",
+    "coding": "Request code blocks or optimization steps…",
 }
 
 if user_input := st.chat_input(placeholder_text[mode]):
@@ -585,15 +537,10 @@ if user_input := st.chat_input(placeholder_text[mode]):
     st.session_state.messages.append({"role": "user", "content": content})
     render_message("user", content)
 
-    # For non-text modes, inject a brief system hint about the modality
     messages = list(st.session_state.messages)
-    if mode in ("image", "audio", "video"):
-        # Prepend a temporary context hint (not stored in session)
-        hint = f"The user has uploaded a {mode} file. Analyze it carefully."
-        messages = [{"role": "system", "content": get_system_prompt(mode) + " " + hint}] + messages[1:]
 
     try:
         ai_text = stream_response(messages, model_id)
         st.session_state.messages.append({"role": "assistant", "content": ai_text})
     except Exception as exc:
-        render_message("assistant", f"**Error:** {exc}")
+        render_message("assistant", f"**NVIDIA NIM Error:** {exc}")
