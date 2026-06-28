@@ -1,3 +1,9 @@
 streamlit
 openai
-python-dotenv
+dotenv
+Pillow
+pydub
+moviepy
+transformers
+torch
+requests
