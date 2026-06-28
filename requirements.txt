@@ -1,9 +1,4 @@
 streamlit
 openai
 dotenv
-Pillow
-pydub
-moviepy
-transformers
-torch
-requests
+
