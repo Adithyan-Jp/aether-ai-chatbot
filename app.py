@@ -6,20 +6,23 @@ import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
 
-load_dotenv()
-# Update your .env or Streamlit secrets with your NVIDIA API key (starts with nvapi-)
+# Force load latest environment modifications
+load_dotenv(override=True)
+
+# Fetch API Key from OS Environment or Streamlit Secrets
 API_KEY = os.getenv("NVIDIA_API_KEY") or st.secrets.get("NVIDIA_API_KEY")
 
 st.set_page_config(
     page_title="Aether AI",
     page_icon="✨",
     layout="centered",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",  # Opened by default to check debugging setup
 )
 
+# ── Custom Theme CSS ─────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* ── Base ── */
+/* ── Base App Aesthetics ── */
 .stApp, html, body, [data-testid="stAppViewContainer"] {
     background: #07080D !important;
 }
@@ -30,7 +33,7 @@ st.markdown("""
 }
 #MainMenu, footer, header { visibility: hidden; }
 
-/* ── Header ── */
+/* ── App Sticky Header ── */
 .aether-header {
     position: sticky;
     top: 0;
@@ -77,55 +80,7 @@ st.markdown("""
     text-transform: uppercase;
 }
 
-/* ── Mode selector ── */
-.mode-pill {
-    display: inline-flex;
-    gap: 6px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px;
-    padding: 4px;
-    margin-bottom: 1.5rem;
-}
-.mode-btn {
-    font-size: 12px;
-    font-weight: 500;
-    color: #606880;
-    background: transparent;
-    border: none;
-    border-radius: 7px;
-    padding: 5px 12px;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.mode-btn:hover { color: #A0AEC0; }
-.mode-btn.active {
-    background: rgba(99,102,241,0.12);
-    color: #818CF8;
-    border: 1px solid rgba(99,102,241,0.18);
-}
-
-/* ── Upload area ── */
-.upload-area {
-    background: rgba(255,255,255,0.02);
-    border: 1px dashed rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    text-align: center;
-}
-.upload-area p {
-    color: #4A5568;
-    font-size: 12px;
-    margin: 0;
-}
-.upload-preview {
-    border-radius: 10px;
-    max-width: 100%;
-    margin-top: 0.5rem;
-}
-
-/* ── Chat rows ── */
+/* ── Chat Layout & Bubbles ── */
 .chat-row {
     display: flex;
     width: 100%;
@@ -133,10 +88,9 @@ st.markdown("""
     gap: 10px;
     align-items: flex-start;
 }
-.chat-row.user-row    { justify-content: flex-end; }
+.chat-row.user-row { justify-content: flex-end; }
 .chat-row.assistant-row { justify-content: flex-start; }
 
-/* ── Avatars ── */
 .avatar {
     width: 26px;
     height: 26px;
@@ -154,13 +108,7 @@ st.markdown("""
     border: 1px solid rgba(99,102,241,0.2);
     color: #818CF8;
 }
-.avatar.user {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #606880;
-}
 
-/* ── Bubbles ── */
 .bubble {
     max-width: 80%;
     font-size: 14.5px;
@@ -182,20 +130,8 @@ st.markdown("""
     padding: 0.1rem 0;
     width: 100%;
 }
-.bubble.assistant-bubble p  { margin: 0 0 0.5rem; color: #8A95A3; }
-.bubble.assistant-bubble p:last-child { margin-bottom: 0; }
+.bubble.assistant-bubble p { margin: 0 0 0.5rem; color: #8A95A3; }
 .bubble.assistant-bubble strong { color: #C0C8D8; font-weight: 600; }
-.bubble.assistant-bubble em      { color: #6E7D8C; font-style: italic; }
-.bubble.assistant-bubble ul, .bubble.assistant-bubble ol {
-    margin: 0.35rem 0 0.35rem 1.15rem; padding: 0;
-}
-.bubble.assistant-bubble li { margin-bottom: 4px; color: #8A95A3; }
-.bubble.assistant-bubble h1, .bubble.assistant-bubble h2, .bubble.assistant-bubble h3 {
-    color: #C0C8D8; font-weight: 600; margin: 0.8rem 0 0.35rem;
-}
-.bubble.assistant-bubble h1 { font-size: 17px; }
-.bubble.assistant-bubble h2 { font-size: 15px; }
-.bubble.assistant-bubble h3 { font-size: 14px; }
 .bubble.assistant-bubble code {
     background: #0D0F18;
     border: 1px solid rgba(255,255,255,0.07);
@@ -217,123 +153,85 @@ st.markdown("""
     background: none; border: none; padding: 0;
     color: #9BAFC0; font-size: 12.5px;
 }
-.bubble.assistant-bubble blockquote {
-    border-left: 2px solid rgba(99,102,241,0.3);
-    margin: 0.5rem 0;
-    padding-left: 0.9rem;
-    color: #6E7D8C;
-}
-.bubble.assistant-bubble hr {
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    margin: 0.75rem 0;
-}
-.bubble.assistant-bubble table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 13px;
-    margin: 0.5rem 0;
-}
-.bubble.assistant-bubble th, .bubble.assistant-bubble td {
-    border: 1px solid rgba(255,255,255,0.07);
-    padding: 6px 10px;
-    text-align: left;
-}
-.bubble.assistant-bubble th { color: #C0C8D8; background: rgba(255,255,255,0.03); }
 
-/* ── Input ── */
+/* ── Sticky Chat Input Container ── */
 .stChatInputContainer {
     background: #0C0E17 !important;
     border: 1px solid rgba(255,255,255,0.07) !important;
     border-radius: 14px !important;
     box-shadow: 0 0 0 1px rgba(99,102,241,0.04) !important;
-    transition: border-color 0.2s !important;
-}
-.stChatInputContainer:focus-within {
-    border-color: rgba(99,102,241,0.2) !important;
 }
 .stChatInputContainer textarea {
     color: #C8CEDB !important;
     font-size: 14px !important;
-    background: transparent !important;
 }
 
-/* ── Clear button ── */
-div[data-testid="stButton"] > button {
-    background: transparent !important;
-    border: 1px solid rgba(255,255,255,0.05) !important;
-    color: #4A5568 !important;
-    font-size: 11px !important;
-    border-radius: 8px !important;
-    padding: 3px 12px !important;
-    letter-spacing: 0.3px;
-    transition: all 0.15s !important;
-}
-div[data-testid="stButton"] > button:hover {
-    border-color: rgba(255,255,255,0.09) !important;
-    color: #A0AEC0 !important;
-}
-
-/* ── Divider ── */
-.msg-divider {
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.03);
-    margin: 0.25rem 0 1.75rem;
-}
-
-/* ── Sidebar tweaks ── */
+/* ── Sidebar Custom Look ── */
 [data-testid="stSidebar"] {
     background: #0A0C14 !important;
+    border-right: 1px solid rgba(255,255,255,0.04);
 }
-[data-testid="stSidebar"] .stMarkdown { color: #8A95A3; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Guard ─────────────────────────────────────────────────────────────────────
+# ── Sidebar Debugging Tools ──────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("### ⚙️ Engine Diagnostics")
+    if not API_KEY:
+        st.error("❌ Key Status: Missing Environment Values")
+        st.info("💡 To fix this, create an ecosystem file named `.env` in this directory containing:\n`NVIDIA_API_KEY=nvapi-yourKey`")
+    else:
+        # Diagnostic structural assertion to identify OpenRouter leakage paths
+        if API_KEY.startswith("sk-or-"):
+            st.error("⚠️ Token Issue: Found OpenRouter Token (`sk-or-`) in NVIDIA environment context. Authentications will fail.")
+        elif not API_KEY.startswith("nvapi-"):
+            st.warning("⚠️ Formatting Warning: API key token does not match standard `nvapi-` header configuration format.")
+        else:
+            st.success("🔒 System Context: Key Value Found")
+            
+        # Display safe snippet to prove exactly what string Streamlit is feeding out
+        masked_key = f"{API_KEY[:9]}...{API_KEY[-4:]}" if len(API_KEY) > 12 else "Malformed"
+        st.text_input("Active Runtime Key Vector:", value=masked_key, disabled=True)
 
 if not API_KEY:
-    st.error("🔑 NVIDIA API key not found. Check your environment variables (NVIDIA_API_KEY).")
+    st.error("🔑 NVIDIA NIM Authentication context missing. Set 'NVIDIA_API_KEY' environment value to unlock runtime execution steps.")
     st.stop()
 
-# ── Model registry ───────────────────────────────────────────────────────────
-# Native production slugs for NVIDIA API catalog
+# ── Model Registry for Production NVIDIA Gateways ─────────────────────────────
 MODELS = {
     "text": {
-        "id": "nvidia/llama-3.1-nemotron-70b-instruct",
-        "name": "NVIDIA Nemotron 70B",
-        "desc": "General-purpose text chat & structure generation",
-    },
-    "reasoning": {
-        "id": "nvidia/llama-3.1-nemotron-70b-instruct", 
-        "name": "NVIDIA Nemotron 70B",
-        "desc": "Complex textual inference & instruction following",
+        "id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "name": "Nemotron 3 Ultra 550B",
+        "desc": "General-purpose MoE chat engine",
     },
     "image": {
-        "id": "nvidia/neva-22b",
-        "name": "NVIDIA Neva 22B",
-        "desc": "Vision-Language pipeline for images",
+        "id": "nvidia/nemotron-parse",
+        "name": "Nemotron Parse Vision",
+        "desc": "Multimodal visual reasoning engine",
+    },
+    "reasoning": {
+        "id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "name": "Nemotron 3 Ultra MoE",
+        "desc": "Deep planning, instruction scaling & tasks",
     },
     "coding": {
-        "id": "nvidia/llama-3.1-nemotron-70b-instruct",
-        "name": "NVIDIA Nemotron 70B",
-        "desc": "Advanced contextual coding, reviews, and bugs",
+        "id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "name": "Nemotron 3 Ultra 550B",
+        "desc": "Agentic codebase engineering, synthesis, & review",
     },
 }
 
-# ── Session state ─────────────────────────────────────────────────────────────
-
+# ── Global Architectural Instructions ─────────────────────────────────────────
 SYSTEM_PROMPT = (
-    "You are Aether, an elite AI intelligence engine running natively on NVIDIA NIM architecture. "
-    "Be concise and precise. Use markdown for structure: bold key terms, "
-    "use bullet points for lists, and fenced code blocks for code. "
-    "Never pad responses with filler phrases."
+    "You are Aether, an elite AI intelligence engine powered by native NVIDIA NIM architecture. "
+    "Be concise and precise. Always use markdown for clean structural rendering: bold critical items, "
+    "leverage cleanly organized tables or lists, and use fenced code blocks for syntax outputs."
 )
 
 CODING_SYSTEM_PROMPT = (
-    "You are Aether Code, an expert programming assistant running natively on NVIDIA NIM infrastructure. "
-    "Write clean, well-documented code. Always include type hints and docstrings. "
-    "Explain your reasoning briefly before showing code. "
-    "Use best practices and modern language features."
+    "You are Aether Code, a specialized programming pipeline optimized for software generation. "
+    "Write structural, production-ready code with comprehensive type hints and descriptive docstrings. "
+    "Provide a brief engineering rationale before code blocks. Adhere strictly to clean architecture principles."
 )
 
 if "messages" not in st.session_state:
@@ -343,56 +241,42 @@ if "mode" not in st.session_state:
 if "uploaded_media" not in st.session_state:
     st.session_state.uploaded_media = None
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
+# ── Functional Architecture Subsystems ───────────────────────────────────────
 def file_to_base64(file_bytes: bytes, mime: str) -> str:
     b64 = base64.b64encode(file_bytes).decode("utf-8")
     return f"data:{mime};base64,{b64}"
 
-
 def build_content(text: str, media: dict | None) -> list | str:
-    """Build NVIDIA API compatible multimodal format."""
     if not media:
         return text
-
     content = []
     if text:
         content.append({"type": "text", "text": text})
-
     if media["type"] == "image":
         content.append({"type": "image_url", "image_url": {"url": media["data"]}})
-    
     return content
-
 
 def get_model_for_mode(mode: str) -> str:
     return MODELS[mode]["id"]
 
-
 def get_system_prompt(mode: str) -> str:
-    if mode == "coding":
-        return CODING_SYSTEM_PROMPT
-    return SYSTEM_PROMPT
-
+    return CODING_SYSTEM_PROMPT if mode == "coding" else SYSTEM_PROMPT
 
 def reset_media():
     st.session_state.uploaded_media = None
 
-# ── Header ────────────────────────────────────────────────────────────────────
-
+# ── Rendering Interface Elements ─────────────────────────────────────────────
 st.markdown("""
 <div class="aether-header">
     <div class="aether-brand">
         <div class="aether-logo">✨</div>
-        <div class="aether-title">Aether (NVIDIA NIM)</div>
+        <div class="aether-title">Aether Engine</div>
     </div>
-    <div class="aether-badge">Online</div>
+    <div class="aether-badge">NVIDIA NIM</div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── Mode selector ─────────────────────────────────────────────────────────────
-# Adjusted dynamically to reflect native NVIDIA cloud capabilities
-
+# ── Context Mode Switcher ──
 modes = ["text", "image", "reasoning", "coding"]
 mode_labels = {
     "text": "💬 Text",
@@ -403,24 +287,21 @@ mode_labels = {
 
 cols = st.columns(len(modes))
 for i, m in enumerate(modes):
-    active = st.session_state.mode == m
-    if cols[i].button(mode_labels[m], key=f"mode_{m}", use_container_width=True):
+    active = (st.session_state.mode == m)
+    btn_type = "primary" if active else "secondary"
+    if cols[i].button(mode_labels[m], key=f"mode_{m}", use_container_width=True, type=btn_type):
         st.session_state.mode = m
-        st.session_state.messages[0] = {
-            "role": "system",
-            "content": get_system_prompt(m)
-        }
+        st.session_state.messages[0] = {"role": "system", "content": get_system_prompt(m)}
         reset_media()
         st.rerun()
 
-# ── File uploaders per mode ─────────────────────────────────────────────────
-
+# ── Multimodal Media Pipeline Upload targets ──
 mode = st.session_state.mode
 uploaded = None
 
 if mode == "image":
     uploaded = st.file_uploader(
-        "Upload an image (PNG, JPG, WEBP)",
+        "Ingest Image Blueprint (PNG, JPG, WEBP)",
         type=["png", "jpg", "jpeg", "webp"],
         key="img_uploader",
     )
@@ -438,52 +319,46 @@ if uploaded is not None:
         "name": uploaded.name,
     }
 
-# Show preview of uploaded media
+# Render attached file preview frames
 media = st.session_state.uploaded_media
 if media:
     if media["type"] == "image":
-        st.markdown(f'<img src="{media["data"]}" class="upload-preview" style="max-height:260px;">', unsafe_allow_html=True)
-    if st.button("✕ Remove attachment", key="remove_media"):
+        st.markdown(f'<img src="{media["data"]}" class="upload-preview" style="max-height:200px; border-radius: 8px; margin-bottom: 1rem;">', unsafe_allow_html=True)
+    if st.button("✕ Remove Attachment", key="remove_media"):
         reset_media()
         st.rerun()
 
-# ── Render message ───────────────────────────────────────────────────────────
-
+# ── Message Parsing & Stream Blocks ──────────────────────────────────────────
 def render_message(role: str, content):
     if role == "user":
         if isinstance(content, list):
             text_parts = [c["text"] for c in content if c.get("type") == "text"]
-            display_text = " ".join(text_parts) if text_parts else "[multimodal]"
+            display_text = " ".join(text_parts) if text_parts else "[Image Object Attached]"
         else:
             display_text = content
 
-        safe = (display_text
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;"))
-        
+        safe = display_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         st.markdown(f"""
         <div class="chat-row user-row">
             <div class="bubble user-bubble">{safe}</div>
         </div>""", unsafe_allow_html=True)
     else:
-        col1, col2 = st.columns([0.04, 0.96])
+        col1, col2 = st.columns([0.05, 0.95])
         with col1:
             st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
         with col2:
             st.markdown('<div class="bubble assistant-bubble">', unsafe_allow_html=True)
-            st.markdown(content, unsafe_allow_html=False)
+            st.markdown(content)
             st.markdown('</div>', unsafe_allow_html=True)
 
-
 def stream_response(messages: list, model_id: str) -> str:
-    """Stream directly from native NVIDIA NIM API Gateway."""
+    """Orchestrates stream processing loops with the native NVIDIA endpoint gateways."""
     client = OpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
         api_key=API_KEY
     )
 
-    col1, col2 = st.columns([0.04, 0.96])
+    col1, col2 = st.columns([0.05, 0.95])
     with col1:
         st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
 
@@ -506,14 +381,13 @@ def stream_response(messages: list, model_id: str) -> str:
 
     return accumulated
 
-# ── History ───────────────────────────────────────────────────────────────────
-
+# ── Structural History Management Loop ───────────────────────────────────────
 non_system = [m for m in st.session_state.messages if m["role"] != "system"]
 
 if non_system:
     col1, col2, col3 = st.columns([4, 2, 4])
     with col2:
-        if st.button("✕  Clear", key="clear_chat"):
+        if st.button("✕ Reset Architecture", key="clear_chat", use_container_width=True):
             st.session_state.messages = [{"role": "system", "content": get_system_prompt(mode)}]
             reset_media()
             st.rerun()
@@ -521,13 +395,12 @@ if non_system:
     for msg in non_system:
         render_message(msg["role"], msg["content"])
 
-# ── Input & inference ─────────────────────────────────────────────────────────
-
+# ── Conversational Capture Layer ──────────────────────────────────────────────
 placeholder_text = {
-    "text": "Message Nemotron…",
-    "image": "Ask about this image…",
-    "reasoning": "Ask a hard logical/coding problem…",
-    "coding": "Request code blocks or optimization steps…",
+    "text": "Query Nemotron 3 Ultra...",
+    "image": "Deconstruct or analyze this input canvas...",
+    "reasoning": "Submit complex computational, code-logic, or architectural algorithms...",
+    "coding": "Request optimizations, structural modules, or debugging sequences...",
 }
 
 if user_input := st.chat_input(placeholder_text[mode]):
@@ -537,10 +410,8 @@ if user_input := st.chat_input(placeholder_text[mode]):
     st.session_state.messages.append({"role": "user", "content": content})
     render_message("user", content)
 
-    messages = list(st.session_state.messages)
-
     try:
-        ai_text = stream_response(messages, model_id)
+        ai_text = stream_response(st.session_state.messages, model_id)
         st.session_state.messages.append({"role": "assistant", "content": ai_text})
     except Exception as exc:
-        render_message("assistant", f"**NVIDIA NIM Error:** {exc}")
+        render_message("assistant", f"⚡ **NVIDIA NIM Gateway Exception Alert:** `{exc}`")
