@@ -7,8 +7,8 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
-# Update your .env or Streamlit secrets with your NVIDIA API key (starts with nvapi-)
-API_KEY = os.getenv("NVIDIA_API_KEY") or st.secrets.get("NVIDIA_API_KEY")
+# Update your .env or Streamlit secrets with your OpenRouter API key (starts with sk-or-)
+API_KEY = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY")
 
 st.set_page_config(
     page_title="Aether AI",
@@ -290,12 +290,12 @@ div[data-testid="stButton"] > button:hover {
 # ── Guard ─────────────────────────────────────────────────────────────────────
 
 if not API_KEY:
-    st.error("🔑 NVIDIA API key not found. Check your environment variables.")
+    st.error("🔑 OpenRouter API key not found. Check your environment variables.")
     st.stop()
 
 # ── Model registry ───────────────────────────────────────────────────────────
-# Primary model: nvidia/nemotron-3-ultra-550b-a55b:free (text / reasoning / coding)
-# Multimodal models kept for image, audio, and video modes
+# OpenRouter model IDs (from build.nvidia.com via OpenRouter)
+# Format: developer/model-name (as shown on OpenRouter model pages)
 
 MODELS = {
     "text": {
@@ -309,18 +309,18 @@ MODELS = {
         "desc": "Chain-of-thought reasoning & math",
     },
     "image": {
-        "id": "meta/llama-3.2-90b-vision-instruct",
-        "name": "Llama 3.2 90B Vision",
+        "id": "google/gemini-2.0-flash-001",
+        "name": "Gemini 2.0 Flash",
         "desc": "Vision-language: images + text",
     },
     "video": {
-        "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-        "name": "Nemotron 3 Nano Omni",
+        "id": "google/gemini-2.0-flash-001",
+        "name": "Gemini 2.0 Flash",
         "desc": "Video + image + audio + text understanding",
     },
     "audio": {
-        "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-        "name": "Nemotron 3 Nano Omni",
+        "id": "google/gemini-2.0-flash-001",
+        "name": "Gemini 2.0 Flash",
         "desc": "Audio + speech + text understanding",
     },
     "coding": {
@@ -333,14 +333,14 @@ MODELS = {
 # ── Session state ─────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = (
-    "You are Aether, an elite AI intelligence engine powered by NVIDIA Nemotron 3 Ultra. "
+    "You are Aether, an elite AI intelligence engine powered by NVIDIA Nemotron 3 Ultra via OpenRouter. "
     "Be concise and precise. Use markdown for structure: bold key terms, "
     "use bullet points for lists, and fenced code blocks for code. "
     "Never pad responses with filler phrases."
 )
 
 CODING_SYSTEM_PROMPT = (
-    "You are Aether Code, an expert programming assistant powered by NVIDIA Nemotron 3 Ultra. "
+    "You are Aether Code, an expert programming assistant powered by NVIDIA Nemotron 3 Ultra via OpenRouter. "
     "Write clean, well-documented code. Always include type hints and docstrings. "
     "Explain your reasoning briefly before showing code. "
     "Use best practices and modern language features."
@@ -376,10 +376,10 @@ def build_content(text: str, media: dict | None) -> list | str:
     if mtype == "image":
         content.append({"type": "image_url", "image_url": {"url": b64_url}})
     elif mtype == "audio":
-        # Nemotron Omni accepts audio via base64 data URLs in content
-        content.append({"type": "audio_url", "audio_url": {"url": b64_url}})
+        # OpenRouter accepts audio via input_audio content type
+        content.append({"type": "input_audio", "input_audio": {"data": b64_url.split(",")[1], "format": media["ext"]}})
     elif mtype == "video":
-        # For video, we send as video_url with a data URL (NIM VLM/Omni handles it)
+        # OpenRouter accepts video via video_url content type
         content.append({"type": "video_url", "video_url": {"url": b64_url}})
     return content
 
@@ -519,10 +519,14 @@ def render_message(role: str, content):
 
 
 def stream_response(messages: list, model_id: str) -> str:
-    """Stream directly from NVIDIA NIM and return the full text."""
+    """Stream directly from OpenRouter and return the full text."""
     client = OpenAI(
-        base_url="https://integrate.api.nvidia.com/v1",
+        base_url="https://openrouter.ai/api/v1",
         api_key=API_KEY,
+        default_headers={
+            "HTTP-Referer": "https://aether-ai.app",
+            "X-Title": "Aether AI",
+        },
     )
 
     col1, col2 = st.columns([0.04, 0.96])
