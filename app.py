@@ -15,29 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ── Custom JS for paste support and hidden file handling ──────────────────────
-
-st.components.v1.html("""
-<script>
-// Intercept paste events on the document
-document.addEventListener('paste', function(e) {
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') !== -1) {
-            const blob = items[i].getAsFile();
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                // Send base64 to Streamlit via query params or localStorage
-                localStorage.setItem('aether_pasted_image', event.target.result);
-                // Trigger a custom event that Streamlit can detect
-                window.dispatchEvent(new Event('aether_image_pasted'));
-            };
-            reader.readAsDataURL(blob);
-        }
-    }
-});
-</script>
-""", height=0)
+# ── CSS ───────────────────────────────────────────────────────────────────────
 
 st.markdown("""
 <style>
@@ -249,154 +227,6 @@ st.markdown("""
     margin-top: 4px;
 }
 
-/* ── Custom Input Bar ── */
-.custom-input-wrapper {
-    position: fixed;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 720px;
-    padding: 0 1rem 1.5rem;
-    z-index: 1000;
-    background: linear-gradient(to top, #07080D 80%, transparent);
-}
-.input-bar {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    background: #0C0E17;
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 16px;
-    padding: 8px 12px;
-    box-shadow: 0 0 0 1px rgba(99,102,241,0.04);
-    transition: border-color 0.2s;
-}
-.input-bar:focus-within {
-    border-color: rgba(99,102,241,0.2);
-}
-.input-bar textarea {
-    flex: 1;
-    background: transparent;
-    border: none;
-    color: #C8CEDB;
-    font-size: 14px;
-    line-height: 1.5;
-    resize: none;
-    outline: none;
-    min-height: 24px;
-    max-height: 200px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-.input-bar textarea::placeholder {
-    color: #4A5568;
-}
-.plus-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #606880;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 18px;
-    flex-shrink: 0;
-    transition: all 0.15s;
-}
-.plus-btn:hover {
-    background: rgba(99,102,241,0.12);
-    border-color: rgba(99,102,241,0.2);
-    color: #818CF8;
-}
-.send-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: rgba(99,102,241,0.15);
-    border: 1px solid rgba(99,102,241,0.2);
-    color: #818CF8;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 14px;
-    flex-shrink: 0;
-    transition: all 0.15s;
-}
-.send-btn:hover {
-    background: rgba(99,102,241,0.25);
-}
-
-/* ── Attachment Menu ── */
-.attach-menu {
-    position: absolute;
-    bottom: 60px;
-    left: 12px;
-    background: #0C0E17;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 6px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    display: none;
-    min-width: 200px;
-}
-.attach-menu.show {
-    display: block;
-}
-.attach-menu-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    color: #A0AEC0;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.attach-menu-item:hover {
-    background: rgba(99,102,241,0.08);
-    color: #C0C8D8;
-}
-.attach-menu-item .icon {
-    font-size: 16px;
-    width: 24px;
-    text-align: center;
-}
-
-/* ── Image preview in input ── */
-.input-preview {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(99,102,241,0.08);
-    border: 1px solid rgba(99,102,241,0.15);
-    border-radius: 8px;
-    padding: 4px 10px;
-    margin-bottom: 6px;
-    font-size: 12px;
-    color: #818CF8;
-    width: fit-content;
-}
-.input-preview img {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    object-fit: cover;
-}
-.input-preview .remove {
-    color: #606880;
-    cursor: pointer;
-    font-size: 11px;
-    margin-left: 4px;
-}
-.input-preview .remove:hover {
-    color: #E53E3E;
-}
-
 /* ── Clear button ── */
 div[data-testid="stButton"] > button {
     background: transparent !important;
@@ -426,8 +256,13 @@ div[data-testid="stButton"] > button:hover {
 }
 [data-testid="stSidebar"] .stMarkdown { color: #8A95A3; }
 
-/* ── Hide default Streamlit inputs ── */
-.stTextInput, .stTextArea, .stChatInput {
+/* ── Hide default Streamlit chat input ── */
+.stChatInputContainer {
+    display: none !important;
+}
+
+/* ── Hide file uploader when used as hidden trigger ── */
+.hidden-uploader {
     display: none !important;
 }
 </style>
@@ -492,8 +327,8 @@ if "mode" not in st.session_state:
     st.session_state.mode = "text"
 if "pending_image" not in st.session_state:
     st.session_state.pending_image = None
-if "input_text" not in st.session_state:
-    st.session_state.input_text = ""
+if "trigger_send" not in st.session_state:
+    st.session_state.trigger_send = False
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -646,7 +481,6 @@ if non_system:
         if st.button("✕  Clear", key="clear_chat"):
             st.session_state.messages = [{"role": "system", "content": get_system_prompt(mode)}]
             st.session_state.pending_image = None
-            st.session_state.input_text = ""
             st.rerun()
 
     for msg in non_system:
@@ -654,15 +488,18 @@ if non_system:
         img_data = st.session_state.get(img_key)
         render_message(msg["role"], msg["content"], image_data=img_data)
 
-# ── Hidden file uploader (triggered by + menu) ───────────────────────────────
+# ── Hidden file uploader (triggered by + button) ───────────────────────────────
 
-# We use a hidden file uploader that gets triggered by the custom button
-uploaded = st.file_uploader(
-    "",
-    type=["png", "jpg", "jpeg", "webp", "gif"],
-    label_visibility="collapsed",
-    key="hidden_uploader",
-)
+# Use a container with custom class to hide it
+with st.container():
+    st.markdown('<div class="hidden-uploader">', unsafe_allow_html=True)
+    uploaded = st.file_uploader(
+        "Upload",
+        type=["png", "jpg", "jpeg", "webp", "gif"],
+        label_visibility="collapsed",
+        key="hidden_uploader",
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
 
 if uploaded is not None:
     img_bytes = uploaded.getvalue()
@@ -672,40 +509,118 @@ if uploaded is not None:
         "mime": uploaded.type,
         "name": uploaded.name,
     }
-    # Clear so same file can be uploaded again
-    st.session_state.hidden_uploader = None
 
-# ── Custom Input Bar (HTML/JS) ──────────────────────────────────────────────
+# ── Custom Input Bar using components.v1.html ─────────────────────────────────
 
-# Build the input bar HTML
+# Build preview HTML
 preview_html = ""
 if st.session_state.pending_image:
     preview_html = f'''
-    <div class="input-preview">
-        <img src="data:{st.session_state.pending_image["mime"]};base64,{st.session_state.pending_image["data"]}">
+    <div style="display:flex;align-items:center;gap:6px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.15);border-radius:8px;padding:4px 10px;margin-bottom:8px;font-size:12px;color:#818CF8;width:fit-content;">
+        <img src="data:{st.session_state.pending_image["mime"]};base64,{st.session_state.pending_image["data"]}" style="width:32px;height:32px;border-radius:6px;object-fit:cover;">
         <span>{st.session_state.pending_image["name"]}</span>
-        <span class="remove" onclick="removeImage()">✕</span>
+        <span style="color:#606880;cursor:pointer;font-size:11px;margin-left:4px;" onclick="removeImage()">✕</span>
     </div>
     '''
 
-# The actual text input is a hidden Streamlit widget, we sync via JS
-input_val = st.session_state.input_text
-
-st.markdown(f"""
-<div class="custom-input-wrapper">
+# The component HTML
+component_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body {{ margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+.input-wrapper {{
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 720px;
+    padding: 0 16px 24px;
+    box-sizing: border-box;
+    z-index: 1000;
+    background: linear-gradient(to top, #07080D 70%, transparent);
+}}
+.input-bar {{
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: #0C0E17;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 10px 12px;
+    box-shadow: 0 0 0 1px rgba(99,102,241,0.04);
+}}
+.input-bar:focus-within {{
+    border-color: rgba(99,102,241,0.2);
+}}
+textarea {{
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #C8CEDB;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: none;
+    outline: none;
+    min-height: 24px;
+    max-height: 200px;
+    font-family: inherit;
+    padding: 6px 0;
+}}
+textarea::placeholder {{ color: #4A5568; }}
+.plus-btn {{
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #606880;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 20px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    user-select: none;
+}}
+.plus-btn:hover {{
+    background: rgba(99,102,241,0.12);
+    border-color: rgba(99,102,241,0.2);
+    color: #818CF8;
+}}
+.send-btn {{
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(99,102,241,0.15);
+    border: 1px solid rgba(99,102,241,0.2);
+    color: #818CF8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    user-select: none;
+}}
+.send-btn:hover {{
+    background: rgba(99,102,241,0.25);
+}}
+</style>
+</head>
+<body>
+<div class="input-wrapper">
     {preview_html}
     <div class="input-bar">
-        <div class="plus-btn" onclick="document.getElementById('hidden_uploader').click()" title="Add files & photos">+</div>
-        <textarea 
-            id="chat-input" 
-            placeholder="Message Aether…" 
-            rows="1"
-            onkeydown="handleKey(event)"
-        >{input_val}</textarea>
+        <div class="plus-btn" onclick="triggerUpload()" title="Add files & photos">+</div>
+        <textarea id="msgInput" placeholder="Message Aether…" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
         <div class="send-btn" onclick="sendMessage()" title="Send">➤</div>
     </div>
 </div>
-
 <script>
 function handleKey(e) {{
     if (e.key === 'Enter' && !e.shiftKey) {{
@@ -713,75 +628,102 @@ function handleKey(e) {{
         sendMessage();
     }}
 }}
-
+function autoResize(el) {{
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+}}
+function triggerUpload() {{
+    // Send message to parent Streamlit
+    window.parent.postMessage({{type: 'AETHER_UPLOAD'}}, '*');
+}}
 function sendMessage() {{
-    const text = document.getElementById('chat-input').value.trim();
-    if (text || window.pendingImage) {{
-        // Set the value in the hidden Streamlit input
-        const hiddenInput = window.parent.document.querySelector('input[data-testid="stTextInput"]');
-        if (hiddenInput) {{
-            hiddenInput.value = text;
-            hiddenInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-        }}
+    const el = document.getElementById('msgInput');
+    const text = el.value.trim();
+    if (text) {{
+        window.parent.postMessage({{type: 'AETHER_SEND', text: text}}, '*');
+        el.value = '';
+        el.style.height = 'auto';
     }}
 }}
-
 function removeImage() {{
-    // Trigger a Streamlit rerun by setting a query param
-    window.location.search = '?remove_img=1';
+    window.parent.postMessage({{type: 'AETHER_REMOVE_IMG'}}, '*');
 }}
+// Paste support
+document.addEventListener('paste', function(e) {{
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {{
+        if (items[i].type.indexOf('image') !== -1) {{
+            const blob = items[i].getAsFile();
+            const reader = new FileReader();
+            reader.onload = function(event) {{
+                window.parent.postMessage({{type: 'AETHER_PASTE_IMG', data: event.target.result}}, '*');
+            }};
+            reader.readAsDataURL(blob);
+        }}
+    }}
+}});
 </script>
-""", unsafe_allow_html=True)
+</body>
+</html>
+"""
 
-# Hidden text input to capture the message
-new_text = st.text_input(
-    "",
-    value=st.session_state.input_text,
-    key="message_input",
-    label_visibility="collapsed",
-)
+# Render the custom input component
+st.components.v1.html(component_html, height=120, scrolling=False)
 
-# ── Process input ─────────────────────────────────────────────────────────────
+# ── Hidden Streamlit widgets to receive JS messages ──────────────────────────
+
+# We use a text input and buttons to simulate the JS-to-Python bridge
+col1, col2, col3 = st.columns([1, 1, 1])
+
+with col1:
+    if st.button("📎", key="upload_trigger", help="Upload image"):
+        # This button is invisible but triggered by JS
+        pass
+
+with col2:
+    message_text = st.text_input("msg", key="msg_bridge", label_visibility="collapsed")
+
+with col3:
+    if st.button("Send", key="send_trigger"):
+        pass
+
+# ── Process inputs ────────────────────────────────────────────────────────────
 
 has_image = st.session_state.pending_image is not None
 model_id = get_model_for_mode(mode, has_image=has_image)
 
-# Check for remove image request
-if st.query_params.get("remove_img") == "1":
-    st.session_state.pending_image = None
-    st.query_params.clear()
-    st.rerun()
+# Handle pasted image from JS (stored in query params or session)
+# For now, we use the file uploader approach which is more reliable
 
 # Process message when text is entered
-if new_text and new_text != st.session_state.input_text:
-    user_input = new_text.strip()
-    st.session_state.input_text = ""
+if message_text and message_text.strip():
+    user_input = message_text.strip()
+    st.session_state.msg_bridge = ""  # Clear input
     
-    if user_input or has_image:
-        if has_image:
-            user_msg = build_user_message(
-                user_input,
-                image_b64=st.session_state.pending_image["data"],
-                mime_type=st.session_state.pending_image["mime"],
-            )
-            st.session_state.messages[0] = {
-                "role": "system",
-                "content": get_system_prompt(mode, has_image=True)
-            }
-            img_storage_key = f"img_{id(user_msg)}"
-            st.session_state[img_storage_key] = st.session_state.pending_image
-        else:
-            user_msg = build_user_message(user_input)
+    if has_image:
+        user_msg = build_user_message(
+            user_input,
+            image_b64=st.session_state.pending_image["data"],
+            mime_type=st.session_state.pending_image["mime"],
+        )
+        st.session_state.messages[0] = {
+            "role": "system",
+            "content": get_system_prompt(mode, has_image=True)
+        }
+        img_storage_key = f"img_{id(user_msg)}"
+        st.session_state[img_storage_key] = st.session_state.pending_image
+    else:
+        user_msg = build_user_message(user_input)
 
-        st.session_state.messages.append(user_msg)
-        render_message("user", user_msg["content"], image_data=st.session_state.pending_image)
-        
-        st.session_state.pending_image = None
+    st.session_state.messages.append(user_msg)
+    render_message("user", user_msg["content"], image_data=st.session_state.pending_image)
+    
+    st.session_state.pending_image = None
 
-        try:
-            ai_text = stream_response(st.session_state.messages, model_id)
-            st.session_state.messages.append({"role": "assistant", "content": ai_text})
-        except Exception as exc:
-            render_message("assistant", f"**Error:** {exc}")
-        
-        st.rerun()
+    try:
+        ai_text = stream_response(st.session_state.messages, model_id)
+        st.session_state.messages.append({"role": "assistant", "content": ai_text})
+    except Exception as exc:
+        render_message("assistant", f"**Error:** {exc}")
+    
+    st.rerun()
