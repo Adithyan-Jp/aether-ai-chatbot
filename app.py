@@ -15,6 +15,37 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# ── JavaScript for clipboard paste interception ─────────────────────────────────
+
+st.components.v1.html("""
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Find the chat input textarea
+    const chatInput = document.querySelector('textarea[data-testid="stChatInputTextArea"]');
+    if (!chatInput) return;
+    
+    // Add paste listener
+    chatInput.addEventListener('paste', function(e) {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                e.preventDefault();
+                const blob = items[i].getAsFile();
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    // Store in localStorage for Streamlit to pick up
+                    localStorage.setItem('aether_pasted_image', event.target.result);
+                    // Dispatch custom event
+                    window.dispatchEvent(new CustomEvent('aetherImagePasted'));
+                };
+                reader.readAsDataURL(blob);
+            }
+        }
+    });
+});
+</script>
+""", height=0)
+
 st.markdown("""
 <style>
 /* ── Base ── */
@@ -225,75 +256,15 @@ st.markdown("""
     margin-top: 4px;
 }
 
-/* ── Input area wrapper ── */
-.input-area {
-    position: fixed;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 720px;
-    padding: 0 1rem 1.5rem;
-    z-index: 1000;
-    background: linear-gradient(to top, #07080D 80%, transparent);
-}
-
-/* ── Attachment row ── */
-.attach-row {
+/* ── Image preview above input ── */
+.img-preview-bar {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 8px;
-    padding-left: 4px;
+    padding: 0 4px;
 }
-
-/* ── Clip button (styled file uploader) ── */
-[data-testid="stFileUploader"] {
-    margin-bottom: 0 !important;
-}
-[data-testid="stFileUploader"] > section {
-    border: none !important;
-    padding: 0 !important;
-    background: transparent !important;
-}
-[data-testid="stFileUploader"] > section > div > div {
-    display: none !important;
-}
-[data-testid="stFileUploader"] label {
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    width: 32px !important;
-    height: 32px !important;
-    min-height: 32px !important;
-    color: #606880 !important;
-    font-size: 16px !important;
-    cursor: pointer;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    transition: all 0.15s;
-    margin: 0 !important;
-    padding: 0 !important;
-}
-[data-testid="stFileUploader"] label:hover {
-    color: #818CF8 !important;
-    background: rgba(99,102,241,0.12) !important;
-    border-color: rgba(99,102,241,0.2) !important;
-}
-[data-testid="stFileUploader"] label p {
-    display: none !important;
-}
-[data-testid="stFileUploader"] label::after {
-    content: "📎";
-    font-size: 16px;
-}
-[data-testid="stFileUploader"] small {
-    display: none !important;
-}
-
-/* ── Image preview pill ── */
-.img-pill {
+.img-preview-pill {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -304,19 +275,20 @@ st.markdown("""
     font-size: 12px;
     color: #818CF8;
 }
-.img-pill img {
+.img-preview-pill img {
     width: 24px;
     height: 24px;
     border-radius: 4px;
     object-fit: cover;
 }
 
-/* ── Chat input styling ── */
+/* ── Input ── */
 .stChatInputContainer {
     background: #0C0E17 !important;
     border: 1px solid rgba(255,255,255,0.07) !important;
     border-radius: 16px !important;
     box-shadow: 0 0 0 1px rgba(99,102,241,0.04) !important;
+    transition: border-color 0.2s !important;
 }
 .stChatInputContainer:focus-within {
     border-color: rgba(99,102,241,0.2) !important;
@@ -576,53 +548,31 @@ if non_system:
         img_data = st.session_state.get(img_key)
         render_message(msg["role"], msg["content"], image_data=img_data)
 
-# ── Fixed bottom input area ───────────────────────────────────────────────────
+# ── Image preview above chat input ────────────────────────────────────────────
 
-st.markdown('<div class="input-area">', unsafe_allow_html=True)
-
-# Attachment row: clip button + preview
-st.markdown('<div class="attach-row">', unsafe_allow_html=True)
-
-# File uploader styled as clip button (CSS hides the default UI, shows only 📎)
-uploaded = st.file_uploader(
-    "Attach",
-    type=["png", "jpg", "jpeg", "webp", "gif"],
-    label_visibility="collapsed",
-    key="clip_uploader",
-)
-
-if uploaded is not None:
-    img_bytes = uploaded.getvalue()
-    b64 = encode_image(img_bytes)
-    st.session_state.pending_image = {
-        "data": b64,
-        "mime": uploaded.type,
-        "name": uploaded.name,
-    }
-
-# Show image preview if attached
 if st.session_state.pending_image:
-    col_prev, col_remove = st.columns([0.3, 0.7])
-    with col_prev:
+    st.markdown('<div class="img-preview-bar">', unsafe_allow_html=True)
+    c1, c2 = st.columns([0.4, 0.6])
+    with c1:
         st.markdown(
-            f'<div class="img-pill">'
+            f'<div class="img-preview-pill">'
             f'<img src="data:{st.session_state.pending_image["mime"]};base64,{st.session_state.pending_image["data"]}">'
-            f'<span>{st.session_state.pending_image["name"]}</span>'
+            f'<span>🖼️  {st.session_state.pending_image["name"]}</span>'
             f'</div>',
             unsafe_allow_html=True,
         )
-    with col_remove:
-        if st.button("✕ Remove", key="remove_img", help="Remove image"):
+    with c2:
+        if st.button("✕ Remove", key="remove_img"):
             st.session_state.pending_image = None
             st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True)  # close attach-row
+# ── Chat input ─────────────────────────────────────────────────────────────────
 
-# Chat input
 has_image = st.session_state.pending_image is not None
 model_id = get_model_for_mode(mode, has_image=has_image)
 
-placeholder = "Message Aether…" if not has_image else "Ask about this image…"
+placeholder = "Message Aether… (paste image with Ctrl+V)" if not has_image else "Ask about this image…"
 
 if user_input := st.chat_input(placeholder):
     if has_image:
@@ -653,4 +603,21 @@ if user_input := st.chat_input(placeholder):
     
     st.rerun()
 
-st.markdown('</div>', unsafe_allow_html=True)  # close input-area
+# ── Fallback: Manual image upload (for when paste doesn't work) ─────────────
+
+with st.expander("📎  Can't paste? Click to upload image", expanded=False):
+    manual_upload = st.file_uploader(
+        "Upload screenshot",
+        type=["png", "jpg", "jpeg", "webp", "gif"],
+        label_visibility="collapsed",
+        key="manual_uploader",
+    )
+    if manual_upload is not None:
+        img_bytes = manual_upload.getvalue()
+        b64 = encode_image(img_bytes)
+        st.session_state.pending_image = {
+            "data": b64,
+            "mime": manual_upload.type,
+            "name": manual_upload.name,
+        }
+        st.rerun()
