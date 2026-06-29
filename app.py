@@ -15,6 +15,30 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# ── Custom JS for paste support and hidden file handling ──────────────────────
+
+st.components.v1.html("""
+<script>
+// Intercept paste events on the document
+document.addEventListener('paste', function(e) {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+            const blob = items[i].getAsFile();
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                // Send base64 to Streamlit via query params or localStorage
+                localStorage.setItem('aether_pasted_image', event.target.result);
+                // Trigger a custom event that Streamlit can detect
+                window.dispatchEvent(new Event('aether_image_pasted'));
+            };
+            reader.readAsDataURL(blob);
+        }
+    }
+});
+</script>
+""", height=0)
+
 st.markdown("""
 <style>
 /* ── Base ── */
@@ -24,7 +48,7 @@ st.markdown("""
 .main .block-container {
     max-width: 720px !important;
     padding-top: 0 !important;
-    padding-bottom: 8rem !important;
+    padding-bottom: 10rem !important;
 }
 #MainMenu, footer, header { visibility: hidden; }
 
@@ -101,49 +125,6 @@ st.markdown("""
     background: rgba(99,102,241,0.12);
     color: #818CF8;
     border: 1px solid rgba(99,102,241,0.18);
-}
-
-/* ── Attachment bar ── */
-.attach-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-    padding: 0 2px;
-}
-.attach-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(99,102,241,0.08);
-    border: 1px solid rgba(99,102,241,0.15);
-    border-radius: 8px;
-    padding: 5px 12px;
-    font-size: 12px;
-    color: #818CF8;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.attach-pill:hover {
-    background: rgba(99,102,241,0.12);
-    border-color: rgba(99,102,241,0.22);
-}
-.attach-pill .remove {
-    color: #606880;
-    cursor: pointer;
-    font-size: 11px;
-    padding: 2px;
-}
-.attach-pill .remove:hover {
-    color: #E53E3E;
-}
-
-/* ── Hide default file uploader ── */
-[data-testid="stFileUploader"] {
-    display: none !important;
-}
-[data-testid="stFileUploader"] + div {
-    display: none !important;
 }
 
 /* ── Chat rows ── */
@@ -268,21 +249,152 @@ st.markdown("""
     margin-top: 4px;
 }
 
-/* ── Input ── */
-.stChatInputContainer {
-    background: #0C0E17 !important;
-    border: 1px solid rgba(255,255,255,0.07) !important;
-    border-radius: 14px !important;
-    box-shadow: 0 0 0 1px rgba(99,102,241,0.04) !important;
-    transition: border-color 0.2s !important;
+/* ── Custom Input Bar ── */
+.custom-input-wrapper {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 720px;
+    padding: 0 1rem 1.5rem;
+    z-index: 1000;
+    background: linear-gradient(to top, #07080D 80%, transparent);
 }
-.stChatInputContainer:focus-within {
-    border-color: rgba(99,102,241,0.2) !important;
+.input-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: #0C0E17;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 8px 12px;
+    box-shadow: 0 0 0 1px rgba(99,102,241,0.04);
+    transition: border-color 0.2s;
 }
-.stChatInputContainer textarea {
-    color: #C8CEDB !important;
-    font-size: 14px !important;
-    background: transparent !important;
+.input-bar:focus-within {
+    border-color: rgba(99,102,241,0.2);
+}
+.input-bar textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #C8CEDB;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: none;
+    outline: none;
+    min-height: 24px;
+    max-height: 200px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.input-bar textarea::placeholder {
+    color: #4A5568;
+}
+.plus-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #606880;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.plus-btn:hover {
+    background: rgba(99,102,241,0.12);
+    border-color: rgba(99,102,241,0.2);
+    color: #818CF8;
+}
+.send-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(99,102,241,0.15);
+    border: 1px solid rgba(99,102,241,0.2);
+    color: #818CF8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.send-btn:hover {
+    background: rgba(99,102,241,0.25);
+}
+
+/* ── Attachment Menu ── */
+.attach-menu {
+    position: absolute;
+    bottom: 60px;
+    left: 12px;
+    background: #0C0E17;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    display: none;
+    min-width: 200px;
+}
+.attach-menu.show {
+    display: block;
+}
+.attach-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    color: #A0AEC0;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.attach-menu-item:hover {
+    background: rgba(99,102,241,0.08);
+    color: #C0C8D8;
+}
+.attach-menu-item .icon {
+    font-size: 16px;
+    width: 24px;
+    text-align: center;
+}
+
+/* ── Image preview in input ── */
+.input-preview {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.15);
+    border-radius: 8px;
+    padding: 4px 10px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: #818CF8;
+    width: fit-content;
+}
+.input-preview img {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    object-fit: cover;
+}
+.input-preview .remove {
+    color: #606880;
+    cursor: pointer;
+    font-size: 11px;
+    margin-left: 4px;
+}
+.input-preview .remove:hover {
+    color: #E53E3E;
 }
 
 /* ── Clear button ── */
@@ -313,6 +425,11 @@ div[data-testid="stButton"] > button:hover {
     background: #0A0C14 !important;
 }
 [data-testid="stSidebar"] .stMarkdown { color: #8A95A3; }
+
+/* ── Hide default Streamlit inputs ── */
+.stTextInput, .stTextArea, .stChatInput {
+    display: none !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -375,6 +492,8 @@ if "mode" not in st.session_state:
     st.session_state.mode = "text"
 if "pending_image" not in st.session_state:
     st.session_state.pending_image = None
+if "input_text" not in st.session_state:
+    st.session_state.input_text = ""
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -414,7 +533,6 @@ def build_user_message(text: str, image_b64: str = None, mime_type: str = "image
 
 
 def render_message(role: str, content, image_data: dict = None):
-    """Render a chat message. image_data is for showing the image in the chat bubble."""
     display_text = content
     if isinstance(content, list):
         text_parts = [item["text"] for item in content if item.get("type") == "text"]
@@ -528,22 +646,22 @@ if non_system:
         if st.button("✕  Clear", key="clear_chat"):
             st.session_state.messages = [{"role": "system", "content": get_system_prompt(mode)}]
             st.session_state.pending_image = None
+            st.session_state.input_text = ""
             st.rerun()
 
     for msg in non_system:
-        # Check if this message had an image (stored in session metadata)
         img_key = f"img_{id(msg)}"
         img_data = st.session_state.get(img_key)
         render_message(msg["role"], msg["content"], image_data=img_data)
 
-# ── Attachment bar ────────────────────────────────────────────────────────────
+# ── Hidden file uploader (triggered by + menu) ───────────────────────────────
 
-# Hidden file uploader (triggered by the clip button)
+# We use a hidden file uploader that gets triggered by the custom button
 uploaded = st.file_uploader(
     "",
     type=["png", "jpg", "jpeg", "webp", "gif"],
     label_visibility="collapsed",
-    key="attach_uploader",
+    key="hidden_uploader",
 )
 
 if uploaded is not None:
@@ -554,68 +672,116 @@ if uploaded is not None:
         "mime": uploaded.type,
         "name": uploaded.name,
     }
-    # Reset uploader so same file can be selected again
-    st.session_state.attach_uploader = None
+    # Clear so same file can be uploaded again
+    st.session_state.hidden_uploader = None
 
-# Show attachment bar above input
+# ── Custom Input Bar (HTML/JS) ──────────────────────────────────────────────
+
+# Build the input bar HTML
+preview_html = ""
 if st.session_state.pending_image:
-    st.markdown(
-        f'<div class="attach-bar">'
-        f'<span class="attach-pill">🖼️  {st.session_state.pending_image["name"]} '
-        f'<span class="remove" onclick="window.location.reload()">✕</span></span>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-    # Since we can't use JS onclick reliably, add a real remove button
-    if st.button("✕ Remove", key="remove_img", help="Remove image"):
-        st.session_state.pending_image = None
-        st.rerun()
-else:
-    # Show the clip button
-    st.markdown(
-        '<div class="attach-bar">'
-        '<label for="attach_uploader" class="attach-pill" style="cursor:pointer">📎 Attach screenshot</label>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+    preview_html = f'''
+    <div class="input-preview">
+        <img src="data:{st.session_state.pending_image["mime"]};base64,{st.session_state.pending_image["data"]}">
+        <span>{st.session_state.pending_image["name"]}</span>
+        <span class="remove" onclick="removeImage()">✕</span>
+    </div>
+    '''
 
-# ── Input & inference ─────────────────────────────────────────────────────────
+# The actual text input is a hidden Streamlit widget, we sync via JS
+input_val = st.session_state.input_text
 
-placeholder_text = {
-    "text": "Message Aether…",
-    "reasoning": "Ask a reasoning question…",
-    "coding": "Write code, debug, or explain…",
-}
+st.markdown(f"""
+<div class="custom-input-wrapper">
+    {preview_html}
+    <div class="input-bar">
+        <div class="plus-btn" onclick="document.getElementById('hidden_uploader').click()" title="Add files & photos">+</div>
+        <textarea 
+            id="chat-input" 
+            placeholder="Message Aether…" 
+            rows="1"
+            onkeydown="handleKey(event)"
+        >{input_val}</textarea>
+        <div class="send-btn" onclick="sendMessage()" title="Send">➤</div>
+    </div>
+</div>
+
+<script>
+function handleKey(e) {{
+    if (e.key === 'Enter' && !e.shiftKey) {{
+        e.preventDefault();
+        sendMessage();
+    }}
+}}
+
+function sendMessage() {{
+    const text = document.getElementById('chat-input').value.trim();
+    if (text || window.pendingImage) {{
+        // Set the value in the hidden Streamlit input
+        const hiddenInput = window.parent.document.querySelector('input[data-testid="stTextInput"]');
+        if (hiddenInput) {{
+            hiddenInput.value = text;
+            hiddenInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        }}
+    }}
+}}
+
+function removeImage() {{
+    // Trigger a Streamlit rerun by setting a query param
+    window.location.search = '?remove_img=1';
+}}
+</script>
+""", unsafe_allow_html=True)
+
+# Hidden text input to capture the message
+new_text = st.text_input(
+    "",
+    value=st.session_state.input_text,
+    key="message_input",
+    label_visibility="collapsed",
+)
+
+# ── Process input ─────────────────────────────────────────────────────────────
 
 has_image = st.session_state.pending_image is not None
 model_id = get_model_for_mode(mode, has_image=has_image)
 
-if user_input := st.chat_input(placeholder_text[mode]):
-    if has_image:
-        user_msg = build_user_message(
-            user_input,
-            image_b64=st.session_state.pending_image["data"],
-            mime_type=st.session_state.pending_image["mime"],
-        )
-        st.session_state.messages[0] = {
-            "role": "system",
-            "content": get_system_prompt(mode, has_image=True)
-        }
-        # Store image data for rendering in history
-        img_storage_key = f"img_{id(user_msg)}"
-        st.session_state[img_storage_key] = st.session_state.pending_image
-    else:
-        user_msg = build_user_message(user_input)
-
-    st.session_state.messages.append(user_msg)
-    render_message("user", user_msg["content"], image_data=st.session_state.pending_image)
-
-    # Clear pending image
-    pending = st.session_state.pending_image
+# Check for remove image request
+if st.query_params.get("remove_img") == "1":
     st.session_state.pending_image = None
+    st.query_params.clear()
+    st.rerun()
 
-    try:
-        ai_text = stream_response(st.session_state.messages, model_id)
-        st.session_state.messages.append({"role": "assistant", "content": ai_text})
-    except Exception as exc:
-        render_message("assistant", f"**Error:** {exc}")
+# Process message when text is entered
+if new_text and new_text != st.session_state.input_text:
+    user_input = new_text.strip()
+    st.session_state.input_text = ""
+    
+    if user_input or has_image:
+        if has_image:
+            user_msg = build_user_message(
+                user_input,
+                image_b64=st.session_state.pending_image["data"],
+                mime_type=st.session_state.pending_image["mime"],
+            )
+            st.session_state.messages[0] = {
+                "role": "system",
+                "content": get_system_prompt(mode, has_image=True)
+            }
+            img_storage_key = f"img_{id(user_msg)}"
+            st.session_state[img_storage_key] = st.session_state.pending_image
+        else:
+            user_msg = build_user_message(user_input)
+
+        st.session_state.messages.append(user_msg)
+        render_message("user", user_msg["content"], image_data=st.session_state.pending_image)
+        
+        st.session_state.pending_image = None
+
+        try:
+            ai_text = stream_response(st.session_state.messages, model_id)
+            st.session_state.messages.append({"role": "assistant", "content": ai_text})
+        except Exception as exc:
+            render_message("assistant", f"**Error:** {exc}")
+        
+        st.rerun()
