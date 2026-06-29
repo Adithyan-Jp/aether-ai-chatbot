@@ -15,8 +15,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ── CSS ───────────────────────────────────────────────────────────────────────
-
 st.markdown("""
 <style>
 /* ── Base ── */
@@ -26,7 +24,7 @@ st.markdown("""
 .main .block-container {
     max-width: 720px !important;
     padding-top: 0 !important;
-    padding-bottom: 10rem !important;
+    padding-bottom: 6rem !important;
 }
 #MainMenu, footer, header { visibility: hidden; }
 
@@ -227,6 +225,68 @@ st.markdown("""
     margin-top: 4px;
 }
 
+/* ── Input area wrapper ── */
+.input-area {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 720px;
+    padding: 0 1rem 1.5rem;
+    z-index: 1000;
+    background: linear-gradient(to top, #07080D 80%, transparent);
+}
+
+/* ── Attachment row ── */
+.attach-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-left: 4px;
+}
+
+/* ── Clip button (styled file uploader) ── */
+.clip-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #606880;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.15s;
+}
+.clip-btn:hover {
+    background: rgba(99,102,241,0.12);
+    border-color: rgba(99,102,241,0.2);
+    color: #818CF8;
+}
+
+/* ── Image preview pill ── */
+.img-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.15);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: #818CF8;
+}
+.img-pill img {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
 /* ── Clear button ── */
 div[data-testid="stButton"] > button {
     background: transparent !important;
@@ -250,20 +310,65 @@ div[data-testid="stButton"] > button:hover {
     margin: 0.25rem 0 1.75rem;
 }
 
-/* ── Sidebar tweaks ── */
-[data-testid="stSidebar"] {
-    background: #0A0C14 !important;
+/* ── Hide default file uploader chrome, keep only the button area ── */
+[data-testid="stFileUploader"] {
+    margin-bottom: 0 !important;
 }
-[data-testid="stSidebar"] .stMarkdown { color: #8A95A3; }
+[data-testid="stFileUploader"] > section {
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+}
+[data-testid="stFileUploader"] > section > div > div {
+    display: none !important;
+}
+[data-testid="stFileUploader"] label {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    color: #606880 !important;
+    font-size: 16px !important;
+    cursor: pointer;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.15s;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+[data-testid="stFileUploader"] label:hover {
+    color: #818CF8 !important;
+    background: rgba(99,102,241,0.12) !important;
+    border-color: rgba(99,102,241,0.2) !important;
+}
+[data-testid="stFileUploader"] label p {
+    display: none !important;
+}
+[data-testid="stFileUploader"] label::after {
+    content: "📎";
+    font-size: 16px;
+}
+[data-testid="stFileUploader"] small {
+    display: none !important;
+}
 
-/* ── Hide default Streamlit chat input ── */
+/* ── Chat input styling ── */
 .stChatInputContainer {
-    display: none !important;
+    background: #0C0E17 !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 0 0 1px rgba(99,102,241,0.04) !important;
 }
-
-/* ── Hide file uploader when used as hidden trigger ── */
-.hidden-uploader {
-    display: none !important;
+.stChatInputContainer:focus-within {
+    border-color: rgba(99,102,241,0.2) !important;
+}
+.stChatInputContainer textarea {
+    color: #C8CEDB !important;
+    font-size: 14px !important;
+    background: transparent !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -327,8 +432,6 @@ if "mode" not in st.session_state:
     st.session_state.mode = "text"
 if "pending_image" not in st.session_state:
     st.session_state.pending_image = None
-if "trigger_send" not in st.session_state:
-    st.session_state.trigger_send = False
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -488,18 +591,20 @@ if non_system:
         img_data = st.session_state.get(img_key)
         render_message(msg["role"], msg["content"], image_data=img_data)
 
-# ── Hidden file uploader (triggered by + button) ───────────────────────────────
+# ── Fixed bottom input area ───────────────────────────────────────────────────
 
-# Use a container with custom class to hide it
-with st.container():
-    st.markdown('<div class="hidden-uploader">', unsafe_allow_html=True)
-    uploaded = st.file_uploader(
-        "Upload",
-        type=["png", "jpg", "jpeg", "webp", "gif"],
-        label_visibility="collapsed",
-        key="hidden_uploader",
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('<div class="input-area">', unsafe_allow_html=True)
+
+# Attachment row: clip button + preview
+st.markdown('<div class="attach-row">', unsafe_allow_html=True)
+
+# File uploader styled as clip button (CSS hides the default UI, shows only 📎)
+uploaded = st.file_uploader(
+    "Attach",
+    type=["png", "jpg", "jpeg", "webp", "gif"],
+    label_visibility="collapsed",
+    key="clip_uploader",
+)
 
 if uploaded is not None:
     img_bytes = uploaded.getvalue()
@@ -510,196 +615,31 @@ if uploaded is not None:
         "name": uploaded.name,
     }
 
-# ── Custom Input Bar using components.v1.html ─────────────────────────────────
-
-# Build preview HTML
-preview_html = ""
+# Show image preview if attached
 if st.session_state.pending_image:
-    preview_html = f'''
-    <div style="display:flex;align-items:center;gap:6px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.15);border-radius:8px;padding:4px 10px;margin-bottom:8px;font-size:12px;color:#818CF8;width:fit-content;">
-        <img src="data:{st.session_state.pending_image["mime"]};base64,{st.session_state.pending_image["data"]}" style="width:32px;height:32px;border-radius:6px;object-fit:cover;">
-        <span>{st.session_state.pending_image["name"]}</span>
-        <span style="color:#606880;cursor:pointer;font-size:11px;margin-left:4px;" onclick="removeImage()">✕</span>
-    </div>
-    '''
+    col_prev, col_remove = st.columns([0.3, 0.7])
+    with col_prev:
+        st.markdown(
+            f'<div class="img-pill">'
+            f'<img src="data:{st.session_state.pending_image["mime"]};base64,{st.session_state.pending_image["data"]}">'
+            f'<span>{st.session_state.pending_image["name"]}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    with col_remove:
+        if st.button("✕", key="remove_img", help="Remove image"):
+            st.session_state.pending_image = None
+            st.rerun()
 
-# The component HTML
-component_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-body {{ margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
-.input-wrapper {{
-    position: fixed;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 720px;
-    padding: 0 16px 24px;
-    box-sizing: border-box;
-    z-index: 1000;
-    background: linear-gradient(to top, #07080D 70%, transparent);
-}}
-.input-bar {{
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    background: #0C0E17;
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 16px;
-    padding: 10px 12px;
-    box-shadow: 0 0 0 1px rgba(99,102,241,0.04);
-}}
-.input-bar:focus-within {{
-    border-color: rgba(99,102,241,0.2);
-}}
-textarea {{
-    flex: 1;
-    background: transparent;
-    border: none;
-    color: #C8CEDB;
-    font-size: 14px;
-    line-height: 1.5;
-    resize: none;
-    outline: none;
-    min-height: 24px;
-    max-height: 200px;
-    font-family: inherit;
-    padding: 6px 0;
-}}
-textarea::placeholder {{ color: #4A5568; }}
-.plus-btn {{
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #606880;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 20px;
-    flex-shrink: 0;
-    transition: all 0.15s;
-    user-select: none;
-}}
-.plus-btn:hover {{
-    background: rgba(99,102,241,0.12);
-    border-color: rgba(99,102,241,0.2);
-    color: #818CF8;
-}}
-.send-btn {{
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: rgba(99,102,241,0.15);
-    border: 1px solid rgba(99,102,241,0.2);
-    color: #818CF8;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 14px;
-    flex-shrink: 0;
-    transition: all 0.15s;
-    user-select: none;
-}}
-.send-btn:hover {{
-    background: rgba(99,102,241,0.25);
-}}
-</style>
-</head>
-<body>
-<div class="input-wrapper">
-    {preview_html}
-    <div class="input-bar">
-        <div class="plus-btn" onclick="triggerUpload()" title="Add files & photos">+</div>
-        <textarea id="msgInput" placeholder="Message Aether…" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-        <div class="send-btn" onclick="sendMessage()" title="Send">➤</div>
-    </div>
-</div>
-<script>
-function handleKey(e) {{
-    if (e.key === 'Enter' && !e.shiftKey) {{
-        e.preventDefault();
-        sendMessage();
-    }}
-}}
-function autoResize(el) {{
-    el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
-}}
-function triggerUpload() {{
-    // Send message to parent Streamlit
-    window.parent.postMessage({{type: 'AETHER_UPLOAD'}}, '*');
-}}
-function sendMessage() {{
-    const el = document.getElementById('msgInput');
-    const text = el.value.trim();
-    if (text) {{
-        window.parent.postMessage({{type: 'AETHER_SEND', text: text}}, '*');
-        el.value = '';
-        el.style.height = 'auto';
-    }}
-}}
-function removeImage() {{
-    window.parent.postMessage({{type: 'AETHER_REMOVE_IMG'}}, '*');
-}}
-// Paste support
-document.addEventListener('paste', function(e) {{
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {{
-        if (items[i].type.indexOf('image') !== -1) {{
-            const blob = items[i].getAsFile();
-            const reader = new FileReader();
-            reader.onload = function(event) {{
-                window.parent.postMessage({{type: 'AETHER_PASTE_IMG', data: event.target.result}}, '*');
-            }};
-            reader.readAsDataURL(blob);
-        }}
-    }}
-}});
-</script>
-</body>
-</html>
-"""
+st.markdown('</div>', unsafe_allow_html=True)  # close attach-row
 
-# Render the custom input component
-st.components.v1.html(component_html, height=120, scrolling=False)
-
-# ── Hidden Streamlit widgets to receive JS messages ──────────────────────────
-
-# We use a text input and buttons to simulate the JS-to-Python bridge
-col1, col2, col3 = st.columns([1, 1, 1])
-
-with col1:
-    if st.button("📎", key="upload_trigger", help="Upload image"):
-        # This button is invisible but triggered by JS
-        pass
-
-with col2:
-    message_text = st.text_input("msg", key="msg_bridge", label_visibility="collapsed")
-
-with col3:
-    if st.button("Send", key="send_trigger"):
-        pass
-
-# ── Process inputs ────────────────────────────────────────────────────────────
-
+# Chat input
 has_image = st.session_state.pending_image is not None
 model_id = get_model_for_mode(mode, has_image=has_image)
 
-# Handle pasted image from JS (stored in query params or session)
-# For now, we use the file uploader approach which is more reliable
+placeholder = "Message Aether…" if not has_image else "Ask about this image…"
 
-# Process message when text is entered
-if message_text and message_text.strip():
-    user_input = message_text.strip()
-    st.session_state.msg_bridge = ""  # Clear input
-    
+if user_input := st.chat_input(placeholder):
     if has_image:
         user_msg = build_user_message(
             user_input,
@@ -727,3 +667,5 @@ if message_text and message_text.strip():
         render_message("assistant", f"**Error:** {exc}")
     
     st.rerun()
+
+st.markdown('</div>', unsafe_allow_html=True)  # close input-area
