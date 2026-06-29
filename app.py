@@ -15,11 +15,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ── Paste handler using st.text_area as bridge ────────────────────────────────
-
-# We use a hidden text_area that JavaScript will populate with pasted image data
-# The key insight: st.text_area supports paste natively, and we can intercept it
-
 st.markdown("""
 <style>
 /* ── Base ── */
@@ -421,13 +416,9 @@ def render_message(role: str, content, image_data: dict = None):
         if image_data:
             img_html = f'<img src="data:{image_data["mime"]};base64,{image_data["data"]}" class="chat-img">'
         
-        st.markdown(f"""
-        <div class="chat-row user-row">
-            <div class="bubble user-bubble">
-                {safe}
-                {img_html}
-            </div>
-        </div>""", unsafe_allow_html=True)
+        # Single line HTML to avoid multiline f-string issues
+        html = f'<div class="chat-row user-row"><div class="bubble user-bubble">{safe}{img_html}</div></div>'
+        st.markdown(html, unsafe_allow_html=True)
     else:
         col1, col2 = st.columns([0.04, 0.96])
         with col1:
