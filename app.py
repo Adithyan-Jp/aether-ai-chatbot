@@ -4,6 +4,7 @@ import base64
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
+from streamlit_paste_button import paste_image_button
 
 load_dotenv()
 API_KEY = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY")
@@ -14,37 +15,6 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed",
 )
-
-# ── JavaScript for clipboard paste interception ─────────────────────────────────
-
-st.components.v1.html("""
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Find the chat input textarea
-    const chatInput = document.querySelector('textarea[data-testid="stChatInputTextArea"]');
-    if (!chatInput) return;
-    
-    // Add paste listener
-    chatInput.addEventListener('paste', function(e) {
-        const items = e.clipboardData.items;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf('image') !== -1) {
-                e.preventDefault();
-                const blob = items[i].getAsFile();
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    // Store in localStorage for Streamlit to pick up
-                    localStorage.setItem('aether_pasted_image', event.target.result);
-                    // Dispatch custom event
-                    window.dispatchEvent(new CustomEvent('aetherImagePasted'));
-                };
-                reader.readAsDataURL(blob);
-            }
-        }
-    });
-});
-</script>
-""", height=0)
 
 st.markdown("""
 <style>
@@ -104,34 +74,6 @@ st.markdown("""
     padding: 2px 8px;
     letter-spacing: 0.8px;
     text-transform: uppercase;
-}
-
-/* ── Mode selector ── */
-.mode-pill {
-    display: inline-flex;
-    gap: 6px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px;
-    padding: 4px;
-    margin-bottom: 1.5rem;
-}
-.mode-btn {
-    font-size: 12px;
-    font-weight: 500;
-    color: #606880;
-    background: transparent;
-    border: none;
-    border-radius: 7px;
-    padding: 5px 12px;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.mode-btn:hover { color: #A0AEC0; }
-.mode-btn.active {
-    background: rgba(99,102,241,0.12);
-    color: #818CF8;
-    border: 1px solid rgba(99,102,241,0.18);
 }
 
 /* ── Chat rows ── */
@@ -256,7 +198,7 @@ st.markdown("""
     margin-top: 4px;
 }
 
-/* ── Image preview above input ── */
+/* ── Image preview pill ── */
 .img-preview-bar {
     display: flex;
     align-items: center;
@@ -299,6 +241,23 @@ st.markdown("""
     background: transparent !important;
 }
 
+/* ── Paste button — blend into dark theme ── */
+.paste-btn-wrap button {
+    background: rgba(99,102,241,0.08) !important;
+    border: 1px solid rgba(99,102,241,0.18) !important;
+    color: #818CF8 !important;
+    border-radius: 10px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    padding: 6px 14px !important;
+    cursor: pointer !important;
+    transition: all 0.15s !important;
+}
+.paste-btn-wrap button:hover {
+    background: rgba(99,102,241,0.14) !important;
+    border-color: rgba(99,102,241,0.3) !important;
+}
+
 /* ── Clear button ── */
 div[data-testid="stButton"] > button {
     background: transparent !important;
@@ -313,13 +272,6 @@ div[data-testid="stButton"] > button {
 div[data-testid="stButton"] > button:hover {
     border-color: rgba(255,255,255,0.09) !important;
     color: #A0AEC0 !important;
-}
-
-/* ── Divider ── */
-.msg-divider {
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.03);
-    margin: 0.25rem 0 1.75rem;
 }
 
 /* ── Sidebar tweaks ── */
@@ -361,7 +313,7 @@ MODELS = {
     },
 }
 
-# ── Session state ─────────────────────────────────────────────────────────────
+# ── Prompts ───────────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = (
     "You are Aether, an elite AI intelligence engine powered by OpenRouter Owl Alpha. "
@@ -383,6 +335,8 @@ VISION_SYSTEM_PROMPT = (
     "Be precise about details you observe."
 )
 
+# ── Session state ─────────────────────────────────────────────────────────────
+
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 if "mode" not in st.session_state:
@@ -393,24 +347,26 @@ if "pending_image" not in st.session_state:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_model_for_mode(mode: str, has_image: bool = False) -> str:
-    if has_image:
-        return MODELS["vision"]["id"]
-    return MODELS[mode]["id"]
+    return MODELS["vision"]["id"] if has_image else MODELS[mode]["id"]
 
 
 def get_system_prompt(mode: str, has_image: bool = False) -> str:
     if has_image:
         return VISION_SYSTEM_PROMPT
-    if mode == "coding":
-        return CODING_SYSTEM_PROMPT
-    return SYSTEM_PROMPT
+    return CODING_SYSTEM_PROMPT if mode == "coding" else SYSTEM_PROMPT
 
 
-def encode_image(file_bytes) -> str:
-    return base64.b64encode(file_bytes).decode("utf-8")
+def pil_to_b64(img) -> tuple[str, str]:
+    """Convert a PIL image to (base64_string, mime_type)."""
+    import io
+    buf = io.BytesIO()
+    fmt = img.format or "PNG"
+    img.save(buf, format=fmt)
+    mime = f"image/{fmt.lower()}"
+    return base64.b64encode(buf.getvalue()).decode("utf-8"), mime
 
 
-def build_user_message(text: str, image_b64: str = None, mime_type: str = "image/jpeg") -> dict:
+def build_user_message(text: str, image_b64: str = None, mime_type: str = "image/png") -> dict:
     if image_b64:
         return {
             "role": "user",
@@ -418,9 +374,7 @@ def build_user_message(text: str, image_b64: str = None, mime_type: str = "image
                 {"type": "text", "text": text or "What do you see in this image?"},
                 {
                     "type": "image_url",
-                    "image_url": {
-                        "url": f"data:{mime_type};base64,{image_b64}"
-                    },
+                    "image_url": {"url": f"data:{mime_type};base64,{image_b64}"},
                 },
             ],
         }
@@ -442,11 +396,14 @@ def render_message(role: str, content, image_data: dict = None):
         safe = re.sub(r'\*(.+?)\*', r'<em>\1</em>', safe)
         safe = re.sub(r'`(.+?)`', r'<code>\1</code>', safe)
         safe = safe.replace("\n", "<br>")
-        
+
         img_html = ""
         if image_data:
-            img_html = f'<img src="data:{image_data["mime"]};base64,{image_data["data"]}" class="chat-img">'
-        
+            img_html = (
+                f'<img src="data:{image_data["mime"]};base64,{image_data["data"]}" '
+                f'class="chat-img">'
+            )
+
         st.markdown(f"""
         <div class="chat-row user-row">
             <div class="bubble user-bubble">
@@ -457,7 +414,8 @@ def render_message(role: str, content, image_data: dict = None):
     else:
         col1, col2 = st.columns([0.04, 0.96])
         with col1:
-            st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
+            st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>',
+                        unsafe_allow_html=True)
         with col2:
             st.markdown('<div class="bubble assistant-bubble">', unsafe_allow_html=True)
             st.markdown(display_text, unsafe_allow_html=False)
@@ -476,12 +434,11 @@ def stream_response(messages: list, model_id: str) -> str:
 
     col1, col2 = st.columns([0.04, 0.96])
     with col1:
-        st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
-
+        st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>',
+                    unsafe_allow_html=True)
     with col2:
-        stream_placeholder = st.empty()
+        placeholder = st.empty()
         accumulated = ""
-
         with client.chat.completions.create(
             model=model_id,
             messages=messages,
@@ -489,11 +446,9 @@ def stream_response(messages: list, model_id: str) -> str:
         ) as stream:
             for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
-                    delta = chunk.choices[0].delta.content
-                    accumulated += delta
-                    stream_placeholder.markdown(accumulated + "▋")
-
-        stream_placeholder.markdown(accumulated)
+                    accumulated += chunk.choices[0].delta.content
+                    placeholder.markdown(accumulated + "▋")
+        placeholder.markdown(accumulated)
 
     return accumulated
 
@@ -512,26 +467,18 @@ st.markdown("""
 # ── Mode selector ─────────────────────────────────────────────────────────────
 
 modes = ["text", "reasoning", "coding"]
-mode_labels = {
-    "text": "💬 Text",
-    "reasoning": "🧠 Reasoning",
-    "coding": "💻 Coding",
-}
+mode_labels = {"text": "💬 Text", "reasoning": "🧠 Reasoning", "coding": "💻 Coding"}
 
 cols = st.columns(len(modes))
 for i, m in enumerate(modes):
-    active = st.session_state.mode == m
     if cols[i].button(mode_labels[m], key=f"mode_{m}", use_container_width=True):
         st.session_state.mode = m
-        st.session_state.messages[0] = {
-            "role": "system",
-            "content": get_system_prompt(m)
-        }
+        st.session_state.messages[0] = {"role": "system", "content": get_system_prompt(m)}
         st.rerun()
 
 mode = st.session_state.mode
 
-# ── History ───────────────────────────────────────────────────────────────────
+# ── Chat history ──────────────────────────────────────────────────────────────
 
 non_system = [m for m in st.session_state.messages if m["role"] != "system"]
 
@@ -539,60 +486,75 @@ if non_system:
     col1, col2, col3 = st.columns([4, 2, 4])
     with col2:
         if st.button("✕  Clear", key="clear_chat"):
-            st.session_state.messages = [{"role": "system", "content": get_system_prompt(mode)}]
+            st.session_state.messages = [
+                {"role": "system", "content": get_system_prompt(mode)}
+            ]
             st.session_state.pending_image = None
             st.rerun()
 
     for msg in non_system:
         img_key = f"img_{id(msg)}"
-        img_data = st.session_state.get(img_key)
-        render_message(msg["role"], msg["content"], image_data=img_data)
+        render_message(msg["role"], msg["content"],
+                       image_data=st.session_state.get(img_key))
 
-# ── Image preview above chat input ────────────────────────────────────────────
+# ── Paste button + image preview ──────────────────────────────────────────────
 
-if st.session_state.pending_image:
-    st.markdown('<div class="img-preview-bar">', unsafe_allow_html=True)
-    c1, c2 = st.columns([0.4, 0.6])
-    with c1:
-        st.markdown(
-            f'<div class="img-preview-pill">'
-            f'<img src="data:{st.session_state.pending_image["mime"]};base64,{st.session_state.pending_image["data"]}">'
-            f'<span>🖼️  {st.session_state.pending_image["name"]}</span>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    with c2:
-        if st.button("✕ Remove", key="remove_img"):
-            st.session_state.pending_image = None
-            st.rerun()
+# Row: [paste button] [preview pill + remove]
+paste_col, preview_col = st.columns([1, 3])
+
+with paste_col:
+    st.markdown('<div class="paste-btn-wrap">', unsafe_allow_html=True)
+    paste_result = paste_image_button(
+        label="📋 Paste image",
+        key="paste_btn",
+        errors="ignore",  # silently ignore non-image clipboard content
+    )
     st.markdown('</div>', unsafe_allow_html=True)
+
+# If the user just pasted something, store it
+if paste_result and paste_result.image_data is not None:
+    b64, mime = pil_to_b64(paste_result.image_data)
+    st.session_state.pending_image = {"data": b64, "mime": mime, "name": "pasted-image"}
+    st.rerun()
+
+with preview_col:
+    if st.session_state.pending_image:
+        p = st.session_state.pending_image
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.markdown(
+                f'<div class="img-preview-pill">'
+                f'<img src="data:{p["mime"]};base64,{p["data"]}">'
+                f'<span>🖼️ {p["name"]}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        with c2:
+            if st.button("✕", key="remove_img"):
+                st.session_state.pending_image = None
+                st.rerun()
 
 # ── Chat input ─────────────────────────────────────────────────────────────────
 
 has_image = st.session_state.pending_image is not None
 model_id = get_model_for_mode(mode, has_image=has_image)
+placeholder_txt = "Ask about this image…" if has_image else "Message Aether…"
 
-placeholder = "Message Aether… (paste image with Ctrl+V)" if not has_image else "Ask about this image…"
-
-if user_input := st.chat_input(placeholder):
+if user_input := st.chat_input(placeholder_txt):
     if has_image:
-        user_msg = build_user_message(
-            user_input,
-            image_b64=st.session_state.pending_image["data"],
-            mime_type=st.session_state.pending_image["mime"],
-        )
+        p = st.session_state.pending_image
+        user_msg = build_user_message(user_input, image_b64=p["data"], mime_type=p["mime"])
         st.session_state.messages[0] = {
             "role": "system",
-            "content": get_system_prompt(mode, has_image=True)
+            "content": get_system_prompt(mode, has_image=True),
         }
-        img_storage_key = f"img_{id(user_msg)}"
-        st.session_state[img_storage_key] = st.session_state.pending_image
+        st.session_state[f"img_{id(user_msg)}"] = p
     else:
         user_msg = build_user_message(user_input)
 
     st.session_state.messages.append(user_msg)
-    render_message("user", user_msg["content"], image_data=st.session_state.pending_image)
-    
+    render_message("user", user_msg["content"],
+                   image_data=st.session_state.pending_image)
     st.session_state.pending_image = None
 
     try:
@@ -600,24 +562,5 @@ if user_input := st.chat_input(placeholder):
         st.session_state.messages.append({"role": "assistant", "content": ai_text})
     except Exception as exc:
         render_message("assistant", f"**Error:** {exc}")
-    
+
     st.rerun()
-
-# ── Fallback: Manual image upload (for when paste doesn't work) ─────────────
-
-with st.expander("📎  Can't paste? Click to upload image", expanded=False):
-    manual_upload = st.file_uploader(
-        "Upload screenshot",
-        type=["png", "jpg", "jpeg", "webp", "gif"],
-        label_visibility="collapsed",
-        key="manual_uploader",
-    )
-    if manual_upload is not None:
-        img_bytes = manual_upload.getvalue()
-        b64 = encode_image(img_bytes)
-        st.session_state.pending_image = {
-            "data": b64,
-            "mime": manual_upload.type,
-            "name": manual_upload.name,
-        }
-        st.rerun()
