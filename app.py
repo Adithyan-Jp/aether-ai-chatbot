@@ -24,7 +24,7 @@ st.markdown("""
 .main .block-container {
     max-width: 720px !important;
     padding-top: 0 !important;
-    padding-bottom: 6rem !important;
+    padding-bottom: 8rem !important;
 }
 #MainMenu, footer, header { visibility: hidden; }
 
@@ -225,7 +225,7 @@ st.markdown("""
     margin-top: 4px;
 }
 
-/* ── Image preview above input ── */
+/* ── Image preview ── */
 .img-preview-bar {
     display: flex;
     align-items: center;
@@ -249,6 +249,27 @@ st.markdown("""
     height: 24px;
     border-radius: 4px;
     object-fit: cover;
+}
+
+/* ── Upload button ── */
+.upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: #606880;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 8px;
+}
+.upload-btn:hover {
+    background: rgba(99,102,241,0.08);
+    border-color: rgba(99,102,241,0.15);
+    color: #818CF8;
 }
 
 /* ── Input ── */
@@ -416,7 +437,6 @@ def render_message(role: str, content, image_data: dict = None):
         if image_data:
             img_html = f'<img src="data:{image_data["mime"]};base64,{image_data["data"]}" class="chat-img">'
         
-        # Single line HTML to avoid multiline f-string issues
         html = f'<div class="chat-row user-row"><div class="bubble user-bubble">{safe}{img_html}</div></div>'
         st.markdown(html, unsafe_allow_html=True)
     else:
@@ -531,6 +551,27 @@ if st.session_state.pending_image:
             st.session_state.pending_image = None
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
+
+# ── Upload button ─────────────────────────────────────────────────────────────
+
+st.markdown('<div class="upload-btn">📎 Attach screenshot</div>', unsafe_allow_html=True)
+
+uploaded = st.file_uploader(
+    "",
+    type=["png", "jpg", "jpeg", "webp", "gif"],
+    label_visibility="collapsed",
+    key="screenshot_uploader",
+)
+
+if uploaded is not None:
+    img_bytes = uploaded.getvalue()
+    b64 = encode_image(img_bytes)
+    st.session_state.pending_image = {
+        "data": b64,
+        "mime": uploaded.type,
+        "name": uploaded.name,
+    }
+    st.rerun()
 
 # ── Chat input ─────────────────────────────────────────────────────────────────
 
