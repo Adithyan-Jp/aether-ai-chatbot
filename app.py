@@ -248,69 +248,6 @@ st.markdown("""
 }
 
 /* ── Clip button (styled file uploader) ── */
-.clip-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #606880;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 16px;
-    transition: all 0.15s;
-}
-.clip-btn:hover {
-    background: rgba(99,102,241,0.12);
-    border-color: rgba(99,102,241,0.2);
-    color: #818CF8;
-}
-
-/* ── Image preview pill ── */
-.img-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(99,102,241,0.08);
-    border: 1px solid rgba(99,102,241,0.15);
-    border-radius: 8px;
-    padding: 4px 10px;
-    font-size: 12px;
-    color: #818CF8;
-}
-.img-pill img {
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    object-fit: cover;
-}
-
-/* ── Clear button ── */
-div[data-testid="stButton"] > button {
-    background: transparent !important;
-    border: 1px solid rgba(255,255,255,0.05) !important;
-    color: #4A5568 !important;
-    font-size: 11px !important;
-    border-radius: 8px !important;
-    padding: 3px 12px !important;
-    letter-spacing: 0.3px;
-    transition: all 0.15s !important;
-}
-div[data-testid="stButton"] > button:hover {
-    border-color: rgba(255,255,255,0.09) !important;
-    color: #A0AEC0 !important;
-}
-
-/* ── Divider ── */
-.msg-divider {
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.03);
-    margin: 0.25rem 0 1.75rem;
-}
-
-/* ── Hide default file uploader chrome, keep only the button area ── */
 [data-testid="stFileUploader"] {
     margin-bottom: 0 !important;
 }
@@ -355,6 +292,25 @@ div[data-testid="stButton"] > button:hover {
     display: none !important;
 }
 
+/* ── Image preview pill ── */
+.img-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.15);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: #818CF8;
+}
+.img-pill img {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
 /* ── Chat input styling ── */
 .stChatInputContainer {
     background: #0C0E17 !important;
@@ -370,6 +326,35 @@ div[data-testid="stButton"] > button:hover {
     font-size: 14px !important;
     background: transparent !important;
 }
+
+/* ── Clear button ── */
+div[data-testid="stButton"] > button {
+    background: transparent !important;
+    border: 1px solid rgba(255,255,255,0.05) !important;
+    color: #4A5568 !important;
+    font-size: 11px !important;
+    border-radius: 8px !important;
+    padding: 3px 12px !important;
+    letter-spacing: 0.3px;
+    transition: all 0.15s !important;
+}
+div[data-testid="stButton"] > button:hover {
+    border-color: rgba(255,255,255,0.09) !important;
+    color: #A0AEC0 !important;
+}
+
+/* ── Divider ── */
+.msg-divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.03);
+    margin: 0.25rem 0 1.75rem;
+}
+
+/* ── Sidebar tweaks ── */
+[data-testid="stSidebar"] {
+    background: #0A0C14 !important;
+}
+[data-testid="stSidebar"] .stMarkdown { color: #8A95A3; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -627,7 +612,7 @@ if st.session_state.pending_image:
             unsafe_allow_html=True,
         )
     with col_remove:
-        if st.button("✕", key="remove_img", help="Remove image"):
+        if st.button("✕ Remove", key="remove_img", help="Remove image"):
             st.session_state.pending_image = None
             st.rerun()
 
