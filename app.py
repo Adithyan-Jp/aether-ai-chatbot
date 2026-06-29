@@ -1,11 +1,11 @@
 import os
 import re
+import base64
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
-# Update your .env or Streamlit secrets with your OpenRouter API key (starts with sk-or-)
 API_KEY = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY")
 
 st.set_page_config(
@@ -103,24 +103,47 @@ st.markdown("""
     border: 1px solid rgba(99,102,241,0.18);
 }
 
-/* ── Upload area ── */
-.upload-area {
-    background: rgba(255,255,255,0.02);
-    border: 1px dashed rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    text-align: center;
+/* ── Attachment bar ── */
+.attach-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding: 0 2px;
 }
-.upload-area p {
-    color: #4A5568;
+.attach-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.15);
+    border-radius: 8px;
+    padding: 5px 12px;
     font-size: 12px;
-    margin: 0;
+    color: #818CF8;
+    cursor: pointer;
+    transition: all 0.15s;
 }
-.upload-preview {
-    border-radius: 10px;
-    max-width: 100%;
-    margin-top: 0.5rem;
+.attach-pill:hover {
+    background: rgba(99,102,241,0.12);
+    border-color: rgba(99,102,241,0.22);
+}
+.attach-pill .remove {
+    color: #606880;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px;
+}
+.attach-pill .remove:hover {
+    color: #E53E3E;
+}
+
+/* ── Hide default file uploader ── */
+[data-testid="stFileUploader"] {
+    display: none !important;
+}
+[data-testid="stFileUploader"] + div {
+    display: none !important;
 }
 
 /* ── Chat rows ── */
@@ -237,6 +260,14 @@ st.markdown("""
 }
 .bubble.assistant-bubble th { color: #C0C8D8; background: rgba(255,255,255,0.03); }
 
+/* ── Image in chat ── */
+.chat-img {
+    max-width: 280px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+    margin-top: 4px;
+}
+
 /* ── Input ── */
 .stChatInputContainer {
     background: #0C0E17 !important;
@@ -309,6 +340,11 @@ MODELS = {
         "name": "Owl Alpha",
         "desc": "Fast coding, functions, bug fixes",
     },
+    "vision": {
+        "id": "google/gemini-2.0-flash-exp:free",
+        "name": "Gemini Flash",
+        "desc": "Vision & image understanding",
+    },
 }
 
 # ── Session state ─────────────────────────────────────────────────────────────
@@ -327,63 +363,65 @@ CODING_SYSTEM_PROMPT = (
     "Use best practices and modern language features."
 )
 
+VISION_SYSTEM_PROMPT = (
+    "You are Aether Vision, an AI that can see and understand images. "
+    "Describe images accurately and concisely. Answer questions about visual content. "
+    "Be precise about details you observe."
+)
+
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 if "mode" not in st.session_state:
     st.session_state.mode = "text"
+if "pending_image" not in st.session_state:
+    st.session_state.pending_image = None
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def get_model_for_mode(mode: str) -> str:
+def get_model_for_mode(mode: str, has_image: bool = False) -> str:
+    if has_image:
+        return MODELS["vision"]["id"]
     return MODELS[mode]["id"]
 
 
-def get_system_prompt(mode: str) -> str:
+def get_system_prompt(mode: str, has_image: bool = False) -> str:
+    if has_image:
+        return VISION_SYSTEM_PROMPT
     if mode == "coding":
         return CODING_SYSTEM_PROMPT
     return SYSTEM_PROMPT
 
-# ── Header ────────────────────────────────────────────────────────────────────
 
-st.markdown("""
-<div class="aether-header">
-    <div class="aether-brand">
-        <div class="aether-logo">✨</div>
-        <div class="aether-title">Aether</div>
-    </div>
-    <div class="aether-badge">Online</div>
-</div>
-""", unsafe_allow_html=True)
+def encode_image(file_bytes) -> str:
+    return base64.b64encode(file_bytes).decode("utf-8")
 
-# ── Mode selector ─────────────────────────────────────────────────────────────
 
-modes = ["text", "reasoning", "coding"]
-mode_labels = {
-    "text": "💬 Text",
-    "reasoning": "🧠 Reasoning",
-    "coding": "💻 Coding",
-}
-
-cols = st.columns(len(modes))
-for i, m in enumerate(modes):
-    active = st.session_state.mode == m
-    cls = "mode-btn active" if active else "mode-btn"
-    if cols[i].button(mode_labels[m], key=f"mode_{m}", use_container_width=True):
-        st.session_state.mode = m
-        # Update system prompt when switching modes
-        st.session_state.messages[0] = {
-            "role": "system",
-            "content": get_system_prompt(m)
+def build_user_message(text: str, image_b64: str = None, mime_type: str = "image/jpeg") -> dict:
+    if image_b64:
+        return {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": text or "What do you see in this image?"},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{mime_type};base64,{image_b64}"
+                    },
+                },
+            ],
         }
-        st.rerun()
+    return {"role": "user", "content": text}
 
-mode = st.session_state.mode
 
-# ── Render message ───────────────────────────────────────────────────────────
+def render_message(role: str, content, image_data: dict = None):
+    """Render a chat message. image_data is for showing the image in the chat bubble."""
+    display_text = content
+    if isinstance(content, list):
+        text_parts = [item["text"] for item in content if item.get("type") == "text"]
+        display_text = " ".join(text_parts) if text_parts else "[Image]"
 
-def render_message(role: str, content):
     if role == "user":
-        safe = (content
+        safe = (str(display_text)
                 .replace("&", "&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;"))
@@ -391,9 +429,17 @@ def render_message(role: str, content):
         safe = re.sub(r'\*(.+?)\*', r'<em>\1</em>', safe)
         safe = re.sub(r'`(.+?)`', r'<code>\1</code>', safe)
         safe = safe.replace("\n", "<br>")
+        
+        img_html = ""
+        if image_data:
+            img_html = f'<img src="data:{image_data["mime"]};base64,{image_data["data"]}" class="chat-img">'
+        
         st.markdown(f"""
         <div class="chat-row user-row">
-            <div class="bubble user-bubble">{safe}</div>
+            <div class="bubble user-bubble">
+                {safe}
+                {img_html}
+            </div>
         </div>""", unsafe_allow_html=True)
     else:
         col1, col2 = st.columns([0.04, 0.96])
@@ -401,12 +447,11 @@ def render_message(role: str, content):
             st.markdown('<div class="avatar ai" style="margin-top:6px">✦</div>', unsafe_allow_html=True)
         with col2:
             st.markdown('<div class="bubble assistant-bubble">', unsafe_allow_html=True)
-            st.markdown(content, unsafe_allow_html=False)
+            st.markdown(display_text, unsafe_allow_html=False)
             st.markdown('</div>', unsafe_allow_html=True)
 
 
 def stream_response(messages: list, model_id: str) -> str:
-    """Stream directly from OpenRouter and return the full text."""
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=API_KEY,
@@ -439,6 +484,40 @@ def stream_response(messages: list, model_id: str) -> str:
 
     return accumulated
 
+# ── Header ────────────────────────────────────────────────────────────────────
+
+st.markdown("""
+<div class="aether-header">
+    <div class="aether-brand">
+        <div class="aether-logo">✨</div>
+        <div class="aether-title">Aether</div>
+    </div>
+    <div class="aether-badge">Online</div>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Mode selector ─────────────────────────────────────────────────────────────
+
+modes = ["text", "reasoning", "coding"]
+mode_labels = {
+    "text": "💬 Text",
+    "reasoning": "🧠 Reasoning",
+    "coding": "💻 Coding",
+}
+
+cols = st.columns(len(modes))
+for i, m in enumerate(modes):
+    active = st.session_state.mode == m
+    if cols[i].button(mode_labels[m], key=f"mode_{m}", use_container_width=True):
+        st.session_state.mode = m
+        st.session_state.messages[0] = {
+            "role": "system",
+            "content": get_system_prompt(m)
+        }
+        st.rerun()
+
+mode = st.session_state.mode
+
 # ── History ───────────────────────────────────────────────────────────────────
 
 non_system = [m for m in st.session_state.messages if m["role"] != "system"]
@@ -448,10 +527,57 @@ if non_system:
     with col2:
         if st.button("✕  Clear", key="clear_chat"):
             st.session_state.messages = [{"role": "system", "content": get_system_prompt(mode)}]
+            st.session_state.pending_image = None
             st.rerun()
 
     for msg in non_system:
-        render_message(msg["role"], msg["content"])
+        # Check if this message had an image (stored in session metadata)
+        img_key = f"img_{id(msg)}"
+        img_data = st.session_state.get(img_key)
+        render_message(msg["role"], msg["content"], image_data=img_data)
+
+# ── Attachment bar ────────────────────────────────────────────────────────────
+
+# Hidden file uploader (triggered by the clip button)
+uploaded = st.file_uploader(
+    "",
+    type=["png", "jpg", "jpeg", "webp", "gif"],
+    label_visibility="collapsed",
+    key="attach_uploader",
+)
+
+if uploaded is not None:
+    img_bytes = uploaded.getvalue()
+    b64 = encode_image(img_bytes)
+    st.session_state.pending_image = {
+        "data": b64,
+        "mime": uploaded.type,
+        "name": uploaded.name,
+    }
+    # Reset uploader so same file can be selected again
+    st.session_state.attach_uploader = None
+
+# Show attachment bar above input
+if st.session_state.pending_image:
+    st.markdown(
+        f'<div class="attach-bar">'
+        f'<span class="attach-pill">🖼️  {st.session_state.pending_image["name"]} '
+        f'<span class="remove" onclick="window.location.reload()">✕</span></span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    # Since we can't use JS onclick reliably, add a real remove button
+    if st.button("✕ Remove", key="remove_img", help="Remove image"):
+        st.session_state.pending_image = None
+        st.rerun()
+else:
+    # Show the clip button
+    st.markdown(
+        '<div class="attach-bar">'
+        '<label for="attach_uploader" class="attach-pill" style="cursor:pointer">📎 Attach screenshot</label>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 # ── Input & inference ─────────────────────────────────────────────────────────
 
@@ -461,11 +587,32 @@ placeholder_text = {
     "coding": "Write code, debug, or explain…",
 }
 
-if user_input := st.chat_input(placeholder_text[mode]):
-    model_id = get_model_for_mode(mode)
+has_image = st.session_state.pending_image is not None
+model_id = get_model_for_mode(mode, has_image=has_image)
 
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    render_message("user", user_input)
+if user_input := st.chat_input(placeholder_text[mode]):
+    if has_image:
+        user_msg = build_user_message(
+            user_input,
+            image_b64=st.session_state.pending_image["data"],
+            mime_type=st.session_state.pending_image["mime"],
+        )
+        st.session_state.messages[0] = {
+            "role": "system",
+            "content": get_system_prompt(mode, has_image=True)
+        }
+        # Store image data for rendering in history
+        img_storage_key = f"img_{id(user_msg)}"
+        st.session_state[img_storage_key] = st.session_state.pending_image
+    else:
+        user_msg = build_user_message(user_input)
+
+    st.session_state.messages.append(user_msg)
+    render_message("user", user_msg["content"], image_data=st.session_state.pending_image)
+
+    # Clear pending image
+    pending = st.session_state.pending_image
+    st.session_state.pending_image = None
 
     try:
         ai_text = stream_response(st.session_state.messages, model_id)
